@@ -2143,9 +2143,19 @@ with tab_report:
                                        placeholder="e.g. 8 Sarasota Ave")
             if st.button("Save Progress"):
                 if save_name:
-                    save_data = {k.replace("rb_",""): v
-                                 for k, v in st.session_state.items()
-                                 if k.startswith("rb_") and not k.startswith("rb_photo_bytes")}
+                    serializable_types = (str, int, float, bool, list, dict, type(None))
+                    save_data = {}
+                    for k, v in st.session_state.items():
+                        if not k.startswith("rb_"):
+                            continue
+                        if k.startswith("rb_photo_bytes"):
+                            continue
+                        if isinstance(v, serializable_types):
+                            try:
+                                json.dumps(v)
+                                save_data[k.replace("rb_","")] = v
+                            except (TypeError, ValueError):
+                                pass
                     fpath = os.path.join(SAVE_DIR, f"{save_name.replace(' ','_')}.json")
                     with open(fpath, "w") as f:
                         json.dump(save_data, f)
