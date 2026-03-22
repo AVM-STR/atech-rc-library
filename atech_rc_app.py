@@ -771,6 +771,636 @@ def generate_gp_res_pdf(ss):
     return buf.read()
 
 
+
+def generate_gp_res_pdf(ss):
+    """Generate GP Residential PDF from session state."""
+    buf = io.BytesIO()
+
+    # Colors
+    BLACK      = colors.HexColor("#0A0A0A")
+    DARK_GRAY  = colors.HexColor("#222222")
+    MID_GRAY   = colors.HexColor("#666666")
+    LIGHT_GRAY = colors.HexColor("#CCCCCC")
+    VERY_LIGHT = colors.HexColor("#F2F2F2")
+    WHITE      = colors.white
+    W, H       = letter
+
+    def S(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    body  = S("body", fontName="Helvetica", fontSize=9.5, textColor=DARK_GRAY,
+               leading=15, alignment=TA_JUSTIFY, spaceAfter=6)
+    fl    = S("fl", fontName="Helvetica-Bold", fontSize=8, textColor=MID_GRAY, spaceAfter=1)
+    fv    = S("fv", fontName="Helvetica", fontSize=10, textColor=DARK_GRAY, spaceAfter=5)
+    sl    = S("sl", fontName="Helvetica", fontSize=7.5, textColor=MID_GRAY, spaceAfter=1)
+    sv    = S("sv", fontName="Helvetica-Bold", fontSize=8.5, textColor=DARK_GRAY, spaceAfter=3)
+
+    def banner(text, dark=True, w=7.2*inch):
+        bg = BLACK if dark else DARK_GRAY
+        t = Table([[Paragraph(text, S("bh", fontName="Helvetica-Bold",
+                    fontSize=11, textColor=WHITE))]], colWidths=[w])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1),bg),
+            ("LEFTPADDING",(0,0),(-1,-1),10),
+            ("TOPPADDING",(0,0),(-1,-1),7),
+            ("BOTTOMPADDING",(0,0),(-1,-1),7),
+        ]))
+        return t
+
+    def sub_banner(text, w=7.2*inch):
+        t = Table([[Paragraph(text, S("sbh", fontName="Helvetica-Bold",
+                    fontSize=10, textColor=WHITE))]], colWidths=[w])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1),MID_GRAY),
+            ("LEFTPADDING",(0,0),(-1,-1),10),
+            ("TOPPADDING",(0,0),(-1,-1),6),
+            ("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ]))
+        return t
+
+    def stat_card(label, value, width=1.75*inch):
+        t = Table([[Paragraph(label, S("sclabel", fontName="Helvetica", fontSize=7.5,
+                               textColor=MID_GRAY, alignment=TA_CENTER))],
+                   [Paragraph(value, S("scvalue", fontName="Helvetica-Bold", fontSize=10,
+                               textColor=BLACK, alignment=TA_CENTER))]],
+                  colWidths=[width])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1),VERY_LIGHT),
+            ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("BOX",(0,0),(-1,-1),0.75,LIGHT_GRAY),
+        ]))
+        return t
+
+    def four_stats(items):
+        row = [stat_card(l, v, 1.8*inch) for l,v in items]
+        t = Table([row], colWidths=[1.8*inch]*4)
+        t.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
+                                ("RIGHTPADDING",(0,0),(-1,-1),3)]))
+        return t
+
+    def detail_grid(left, right):
+        rows = []
+        for i in range(max(len(left), len(right))):
+            ll, lv = left[i]  if i < len(left)  else ("","")
+            rl, rv = right[i] if i < len(right) else ("","")
+            rows.append([Paragraph(ll,fl), Paragraph(lv,fv),
+                         Paragraph(rl,fl), Paragraph(rv,fv)])
+        t = Table(rows, colWidths=[1.35*inch, 2.2*inch, 1.35*inch, 2.2*inch])
+        t.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("LEFTPADDING",(2,0),(2,-1),16),
+        ]))
+        return t
+
+    def img_cell(file_obj, w, h, label="[ PHOTO ]"):
+        """Convert uploaded file to RLImage or placeholder."""
+        class PhotoBox(Flowable):
+            def __init__(self, width, height, lbl):
+                Flowable.__init__(self)
+                self.width = width; self.height = height; self.lbl = lbl
+            def draw(self):
+                c = self.canv
+                c.setFillColor(colors.HexColor("#DDDDDD"))
+                c.setStrokeColor(colors.HexColor("#BBBBBB"))
+                c.setLineWidth(0.5)
+                c.roundRect(0, 0, self.width, self.height, 3, fill=1, stroke=1)
+                c.setFont("Helvetica", 8)
+                c.setFillColor(colors.HexColor("#888888"))
+                c.drawCentredString(self.width/2, self.height/2-5, self.lbl)
+
+        if file_obj is None:
+            return PhotoBox(w, h, label)
+        try:
+            if isinstance(file_obj, bytes):
+                img_data = file_obj
+            else:
+                file_obj.seek(0)
+                img_data = file_obj.read()
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+            tmp.write(img_data)
+            tmp.close()
+            return RLImage(tmp.name, width=w, height=h)
+        except Exception:
+            return PhotoBox(w, h, label)
+
+    doc = SimpleDocTemplate(buf, pagesize=letter,
+        rightMargin=0.65*inch, leftMargin=0.65*inch,
+        topMargin=0.65*inch, bottomMargin=0.65*inch)
+
+    story = []
+    addr1  = ss.get("rb_address1","")
+    addr2  = ss.get("rb_address2","")
+    eff_dt = ss.get("rb_effective_date","")
+    value  = ss.get("rb_opinion_value","")
+    value_str = f"${value}" if value and not value.startswith("$") else value
+
+    # ══ PAGE 1: COVER ══════════════════════════════════════════════════════
+    # Logo header
+    logo_path = os.path.join(os.path.dirname(__file__), "atech_logo.png")
+    if os.path.exists(logo_path):
+        logo = RLImage(logo_path, width=2.2*inch, height=0.48*inch)
+    else:
+        logo = Paragraph("A-TECH APPRAISAL CO., LLC",
+                          S("lgf", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))
+
+    contact = Table([
+        [Paragraph("P.O. Box 9464, Warwick, RI 02889",
+                   S("c1", fontName="Helvetica", fontSize=8.5,
+                     textColor=DARK_GRAY, alignment=TA_RIGHT))],
+        [Paragraph("(401) 921-4055  |  www.a-techappraisal.com",
+                   S("c2", fontName="Helvetica", fontSize=8.5,
+                     textColor=DARK_GRAY, alignment=TA_RIGHT))],
+    ], colWidths=[4.9*inch])
+    contact.setStyle(TableStyle([
+        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
+    ]))
+
+    hdr = Table([[logo, contact]], colWidths=[2.3*inch, 4.9*inch])
+    hdr.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+        ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
+    ]))
+    story.append(hdr)
+    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY,
+                            spaceBefore=8, spaceAfter=10))
+
+    # Report title
+    story.append(Paragraph("Residential Appraisal Report",
+        S("title", fontName="Helvetica-Bold", fontSize=16,
+          textColor=BLACK, spaceAfter=2)))
+    story.append(Paragraph("Opinion of Market Value — Fee Simple Interest",
+        S("sub", fontName="Helvetica", fontSize=10,
+          textColor=MID_GRAY, spaceAfter=8)))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=12))
+
+    # Photo left + info right
+    front_file = ss.get("rb_photo_bytes_front") or ss.get("rb_photo_front")
+    photo_cell = img_cell(front_file, 3.1*inch, 2.2*inch, "[ FRONT EXTERIOR ]")
+
+    lk = S("lk2", fontName="Helvetica-Bold", fontSize=8.5, textColor=DARK_GRAY,
+            spaceAfter=1, spaceBefore=3)
+    lv2 = S("lv2", fontName="Helvetica", fontSize=9, textColor=BLACK,
+             spaceAfter=0)
+
+    style_text = f"{ss.get('rb_style_attach','')} {ss.get('rb_style_floors','')} Story {ss.get('rb_style_type','')}"
+    beds  = ss.get("rb_bedrooms","—")
+    baths = ss.get("rb_bathrooms_full","—")
+    half  = ss.get("rb_bathrooms_half","0")
+    bath_str = f"{baths} Full" + (f"  |  {half} Half" if half and half != "0" else "")
+
+    info_rows = [
+        [Paragraph("<b>Subject Property:</b>", lk), ""],
+        [Paragraph(addr1, S("adr", fontName="Helvetica-Bold", fontSize=13,
+                             textColor=BLACK, spaceAfter=1)), ""],
+        [Paragraph(addr2, lv2), ""],
+        [Paragraph("<b>Style:</b>", lk), Paragraph(style_text.strip(), lv2)],
+        [Paragraph("<b>Living Area:</b>", lk), Paragraph(f"{ss.get('rb_gla','—')} sq ft", lv2)],
+        [Paragraph("<b>Bedrooms / Baths:</b>", lk), Paragraph(f"{beds} Bedrooms  |  {bath_str}", lv2)],
+        [Paragraph("<b>Year Built:</b>", lk), Paragraph(ss.get("rb_year_built","—"), lv2)],
+        [Paragraph("<b>Property Rights:</b>", lk), Paragraph(ss.get("rb_property_rights","Fee Simple"), lv2)],
+        [Paragraph("<b>Tax Year / Amount:</b>", lk),
+         Paragraph(f"{ss.get('rb_tax_year','—')}  |  ${ss.get('rb_tax_amount','—')}", lv2)],
+        [Paragraph("<b>Effective Date:</b>", lk), Paragraph(eff_dt, lv2)],
+        [Paragraph("<b>Prepared By:</b>", lk),
+         Paragraph("Spencer Webb, CRA  |  A-Tech Appraisal Co., LLC", lv2)],
+    ]
+    info_t = Table(info_rows, colWidths=[1.5*inch, 2.35*inch])
+    info_t.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
+        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),4),
+    ]))
+
+    top_t = Table([[photo_cell, info_t]], colWidths=[3.2*inch, 4.0*inch])
+    top_t.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+        ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
+        ("RIGHTPADDING",(0,0),(0,-1),16),
+        ("LEFTPADDING",(1,0),(1,-1),6),
+    ]))
+    story.append(top_t)
+    story.append(Spacer(1, 12))
+
+    # Summary metrics box
+    story.append(Paragraph("Appraisal Summary",
+        S("h1s", fontName="Helvetica-Bold", fontSize=11,
+          textColor=BLACK, spaceAfter=6)))
+
+    ml = S("ml2", fontName="Helvetica", fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER)
+    mv = S("mv2", fontName="Helvetica-Bold", fontSize=14, textColor=BLACK,
+            alignment=TA_CENTER, leading=18)
+    cw = 7.2*inch/3
+    cond  = ss.get("rb_condition_rating","—")
+    gla   = ss.get("rb_gla","")
+    try:
+        ppsf = f"${int(value.replace(',','').replace('$','')) / int(gla.replace(',','')):.0f}/sf" if value and gla else "—"
+    except Exception:
+        ppsf = "—"
+
+    mx = Table([
+        [Paragraph("Opinion of Market Value", ml),
+         Paragraph("Price Per Sq Ft", ml),
+         Paragraph("Condition", ml)],
+        [Paragraph(value_str or "—", mv),
+         Paragraph(ppsf, mv),
+         Paragraph(cond.split(" — ")[0] if "—" in cond else cond, mv)],
+        [Paragraph("Intended Use", ml),
+         Paragraph("Effective Date", ml),
+         Paragraph("Inspection Type", ml)],
+        [Paragraph(ss.get("rb_intended_use","Market Value")[:30], mv),
+         Paragraph(eff_dt, mv),
+         Paragraph(ss.get("rb_inspection_type","Interior & Exterior"), mv)],
+    ], colWidths=[cw]*3)
+    mx.setStyle(TableStyle([
+        ("BOX",(0,0),(-1,-1),0.75,LIGHT_GRAY),
+        ("INNERGRID",(0,0),(-1,-1),0.5,LIGHT_GRAY),
+        ("BACKGROUND",(0,0),(-1,-1),VERY_LIGHT),
+        ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
+    ]))
+    story.append(mx)
+    story.append(Spacer(1, 10))
+
+    # Prepared for / USPAP footer
+    story.append(HRFlowable(width="100%", thickness=0.5, color=LIGHT_GRAY, spaceAfter=6))
+    story.append(Paragraph(
+        f"Prepared for: <b>{ss.get('rb_intended_user','')}</b>  |  "
+        f"Intended Use: <b>{ss.get('rb_intended_use','')}</b>  |  "
+        f"Property Rights: <b>{ss.get('rb_property_rights','Fee Simple')}</b>",
+        S("pfooter", fontName="Helvetica", fontSize=8, textColor=MID_GRAY,
+          leading=12)))
+    story.append(Paragraph(
+        "This appraisal was developed in conformity with USPAP. The opinion of value is as of the "
+        "stated effective date and is contingent upon the certification and limiting conditions attached.",
+        S("ufooter", fontName="Helvetica", fontSize=8, textColor=MID_GRAY,
+          alignment=TA_JUSTIFY, leading=12)))
+
+    story.append(PageBreak())
+
+    # ══ PAGE 2: SUBJECT PHOTOS & IMPROVEMENTS ════════════════════════════
+    story.append(banner("SUBJECT PROPERTY PHOTOS"))
+    story.append(Spacer(1, 0.12*inch))
+
+    # Exterior 3-up
+    ext_row = Table([[
+        img_cell(ss.get("rb_photo_front"), 2.3*inch, 1.7*inch, "[ FRONT EXTERIOR ]"),
+        img_cell(ss.get("rb_photo_rear"),  2.3*inch, 1.7*inch, "[ REAR EXTERIOR ]"),
+        img_cell(ss.get("rb_photo_street"),2.3*inch, 1.7*inch, "[ STREET SCENE ]"),
+    ]], colWidths=[2.4*inch]*3)
+    ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
+    story.append(ext_row)
+    story.append(Spacer(1, 0.1*inch))
+
+    # Interior room photos
+    room_photos = ss.get("rb_room_photos", [])
+    if room_photos:
+        for i in range(0, len(room_photos), 3):
+            batch = room_photos[i:i+3]
+            while len(batch) < 3:
+                batch.append({"label":"","file":None})
+            row = Table([[
+                Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f'[ {b["label"].upper()} ]')],
+                       [Paragraph(b["label"],
+                                   S("rl", fontName="Helvetica", fontSize=7.5,
+                                     textColor=MID_GRAY, alignment=TA_CENTER))]],
+                      colWidths=[2.35*inch])
+                for b in batch
+            ]], colWidths=[2.4*inch]*3)
+            row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
+            story.append(row)
+            story.append(Spacer(1, 0.08*inch))
+
+    story.append(Spacer(1, 0.1*inch))
+    story.append(sub_banner("IMPROVEMENTS DESCRIPTION"))
+    story.append(Spacer(1, 0.12*inch))
+
+    amenities_list = list(ss.get("rb_amenities") or [])
+    fc = str(ss.get("rb_fireplace_count","0"))
+    wc = str(ss.get("rb_woodstove_count","0"))
+    if fc != "0": amenities_list.append(f"{fc} Fireplace{'s' if fc!='1' else ''}")
+    if wc != "0": amenities_list.append(f"{wc} Woodstove{'s' if wc!='1' else ''}")
+    amenities_str = ", ".join(amenities_list) if amenities_list else "None noted"
+    bsmt_type = ss.get("rb_basement_type","—")
+    bsmt_sf   = ss.get("rb_basement_sf","")
+    bsmt_fin  = ss.get("rb_basement_fin_sf","")
+    bsmt_rms  = ss.get("rb_basement_fin_rooms","")
+    bsmt_str  = bsmt_type
+    if bsmt_sf:
+        bsmt_str += f" — {bsmt_sf} sf"
+    if bsmt_fin and bsmt_fin != "0":
+        bsmt_str += f" / {bsmt_fin} sf finished"
+        if bsmt_rms:
+            bsmt_str += f" ({bsmt_rms} rooms)"
+
+    elec_str = "Public" if ss.get("rb_electricity", True) else "None"
+    story.append(detail_grid(
+        [("STYLE / DESIGN", f"{ss.get('rb_style_attach','')} — {ss.get('rb_style_floors','')} Story {ss.get('rb_style_type','')}"),
+         ("GROSS LIVING AREA", f"{ss.get('rb_gla','—')} sq ft above grade"),
+         ("ROOM COUNT", f"{ss.get('rb_total_rooms','—')} rooms — {ss.get('rb_bedrooms','—')} bed, {ss.get('rb_bathrooms_full','—')} full bath, {ss.get('rb_bathrooms_half','0')} half bath"),
+         ("BASEMENT", bsmt_str),
+         ("AMENITIES", amenities_str)],
+        [("YEAR BUILT", ss.get("rb_year_built","—")),
+         ("HEATING FUEL", ss.get("rb_heating_fuel","—")),
+         ("WATER / SEWER", f"{ss.get('rb_water_type','—')} / {ss.get('rb_sewer_type','—')}"),
+         ("ELECTRICITY", elec_str),
+         ("PARKING", ss.get("rb_parking","—")),
+         ("LOT SIZE", ss.get("rb_lot_size","—")),
+         ("ZONING", f"{ss.get('rb_zoning','')} — {ss.get('rb_zoning_req','')}"),
+         ("ZONING STATUS", ss.get("rb_zoning_comments","—"))]
+    ))
+
+    story.append(PageBreak())
+
+    # ══ PAGE 3: CONDITION & NEIGHBORHOOD ═════════════════════════════════
+    story.append(banner("PROPERTY DESCRIPTION & RATING"))
+    story.append(Spacer(1, 0.12*inch))
+
+    hbu = ss.get("rb_hbu_comment","")
+    if hbu:
+        story.append(Paragraph(f"<b>Highest and Best Use:</b>  {hbu}", body))
+        story.append(Spacer(1, 0.08*inch))
+
+    cond_text = ss.get("rb_condition_narrative","")
+    if cond_text:
+        story.append(Paragraph(cond_text, body))
+
+    story.append(Spacer(1, 0.1*inch))
+    story.append(four_stats([
+        ("CONDITION RATING", ss.get("rb_condition_rating","—").split(" — ")[0]),
+        ("QUALITY RATING",   ss.get("rb_quality_rating","—").split(" — ")[0]),
+        ("YEAR BUILT",       ss.get("rb_year_built","—")),
+        ("GROSS LIVING AREA",f"{ss.get('rb_gla','—')} sf"),
+    ]))
+    story.append(Spacer(1, 0.18*inch))
+
+    story.append(sub_banner("NEIGHBORHOOD & MARKET CONDITIONS"))
+    story.append(Spacer(1, 0.1*inch))
+
+    hood = ss.get("rb_neighborhood_desc","")
+    if hood:
+        story.append(Paragraph(hood, body))
+    mkt = ss.get("rb_market_desc","")
+    if mkt:
+        story.append(Paragraph(mkt, body))
+
+    story.append(Spacer(1, 0.1*inch))
+    story.append(four_stats([
+        ("MARKET CONDITIONS", ss.get("rb_market_conditions","Stable")),
+        ("SUPPLY / DEMAND",   ss.get("rb_supply_demand","—")),
+        ("MARKETING TIME",    ss.get("rb_marketing_time","—")),
+        ("GROWTH RATE",       ss.get("rb_growth_rate","—")),
+    ]))
+    story.append(Spacer(1, 0.12*inch))
+
+    # Housing trends
+    pl = ss.get("rb_price_low","")
+    ph = ss.get("rb_price_high","")
+    pp = ss.get("rb_price_pred","")
+    al = ss.get("rb_age_low","")
+    ah = ss.get("rb_age_high","")
+    ap = ss.get("rb_age_pred","")
+    if any([pl, ph, pp, al, ah, ap]):
+        story.append(sub_banner("ONE-UNIT HOUSING TRENDS"))
+        story.append(Spacer(1,0.08*inch))
+        story.append(detail_grid(
+            [("PRICE LOW", pl), ("PRICE HIGH", ph), ("PRICE PREDOMINANT", pp)],
+            [("AGE LOW (YRS)", al), ("AGE HIGH (YRS)", ah), ("AGE PREDOMINANT (YRS)", ap)]
+        ))
+    story.append(PageBreak())
+
+    # ══ PAGE 4: COMPS ══════════════════════════════════════════════════════
+    story.append(banner("COMPARABLE SALES ANALYSIS"))
+    story.append(Spacer(1, 0.12*inch))
+
+    comp_df_json = ss.get("rb_comp_df")
+    if comp_df_json:
+        try:
+            import pandas as pd
+            df = pd.read_json(comp_df_json)
+            # Build a clean table from the CSV
+            cols = list(df.columns)
+            header = [Paragraph(str(c)[:20], S("ch2", fontName="Helvetica-Bold",
+                        fontSize=7, textColor=WHITE, alignment=TA_CENTER))
+                      for c in cols[:8]]
+            rows = [header]
+            for _, row in df.head(6).iterrows():
+                rows.append([Paragraph(str(row[c])[:25],
+                              S("cd2", fontName="Helvetica", fontSize=7.5,
+                                textColor=DARK_GRAY))
+                             for c in cols[:8]])
+            cw_comp = 7.2*inch / min(8, len(cols))
+            ct = Table(rows, colWidths=[cw_comp]*min(8,len(cols)), repeatRows=1)
+            ct.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,0),BLACK),
+                ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE, VERY_LIGHT]),
+                ("BOX",(0,0),(-1,-1),0.5,LIGHT_GRAY),
+                ("INNERGRID",(0,0),(-1,-1),0.3,LIGHT_GRAY),
+                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
+                ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ]))
+            story.append(ct)
+        except Exception as e:
+            story.append(Paragraph(f"Comp data error: {e}", body))
+    else:
+        story.append(Paragraph("No comparable sales CSV uploaded.", body))
+
+    # Comp photos
+    story.append(Spacer(1, 0.15*inch))
+    story.append(sub_banner("COMPARABLE SALE PHOTOS"))
+    story.append(Spacer(1, 0.1*inch))
+    comp_batch = []
+    for i in range(5):
+        f = ss.get(f"rb_photo_bytes_comp_{i}") or ss.get(f"rb_comp_photo_{i}")
+        addr = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
+        comp_batch.append({"file":f, "label":addr})
+    for i in range(0, 5, 3):
+        batch = comp_batch[i:i+3]
+        while len(batch) < 3:
+            batch.append({"file":None,"label":""})
+        row = Table([[
+            Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f"[ COMP #{i+j+1} ]")],
+                   [Paragraph(b["label"][:40],
+                               S("cl2", fontName="Helvetica", fontSize=7,
+                                 textColor=MID_GRAY, alignment=TA_CENTER))]],
+                  colWidths=[2.35*inch])
+            for j, b in enumerate(batch)
+        ]], colWidths=[2.4*inch]*3)
+        row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
+        story.append(row)
+        story.append(Spacer(1, 0.08*inch))
+
+    story.append(PageBreak())
+
+    # ══ PAGE 5: MAPS ══════════════════════════════════════════════════════
+    story.append(banner("MAPS"))
+    story.append(Spacer(1, 0.12*inch))
+
+    maps_row = Table([[
+        Table([[Paragraph("Plat Map", S("maplbl", fontName="Helvetica-Bold", fontSize=8,
+                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_plat_map") or ss.get("rb_plat_map_file"), 3.4*inch, 2.5*inch, "[ PLAT MAP ]")]],
+              colWidths=[3.5*inch]),
+        Table([[Paragraph("Comparable Sales Map", S("maplbl2", fontName="Helvetica-Bold",
+                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_comp_map") or ss.get("rb_comp_map_file"), 3.4*inch, 2.5*inch, "[ COMP MAP ]")]],
+              colWidths=[3.5*inch]),
+    ]], colWidths=[3.6*inch, 3.6*inch])
+    maps_row.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
+    ]))
+    story.append(maps_row)
+    story.append(PageBreak())
+
+    # ══ PAGE 6: RECONCILIATION & VALUE ════════════════════════════════════
+    story.append(banner("FINAL VALUE CONCLUSION & RECONCILIATION"))
+    story.append(Spacer(1, 0.12*inch))
+
+    recon = ss.get("rb_reconciliation","")
+    if recon:
+        story.append(Paragraph(recon, body))
+
+    # Final value banner
+    fv_t = Table([[
+        Paragraph("FINAL OPINION OF MARKET VALUE",
+                  S("fvl2", fontName="Helvetica-Bold", fontSize=11, textColor=WHITE)),
+        Paragraph(f"AS OF {eff_dt.upper()}",
+                  S("fvd2", fontName="Helvetica", fontSize=9,
+                    textColor=colors.HexColor("#BBBBBB"), alignment=TA_RIGHT)),
+    ],[
+        Paragraph(value_str or "—",
+                  S("fvv2", fontName="Helvetica-Bold", fontSize=26, textColor=WHITE)),
+        Paragraph("",S("fvw2", fontName="Helvetica", fontSize=9, textColor=WHITE)),
+    ]], colWidths=[4.8*inch, 2.4*inch])
+    fv_t.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),BLACK),
+        ("TOPPADDING",(0,0),(-1,0),12),("BOTTOMPADDING",(0,0),(-1,0),6),
+        ("TOPPADDING",(0,1),(-1,1),4),("BOTTOMPADDING",(0,1),(-1,1),14),
+        ("LEFTPADDING",(0,0),(-1,-1),14),("RIGHTPADDING",(0,0),(-1,-1),14),
+        ("VALIGN",(0,0),(-1,0),"BOTTOM"),("VALIGN",(0,1),(-1,1),"TOP"),
+    ]))
+    story.append(fv_t)
+    story.append(PageBreak())
+
+    # ══ PAGE 7: SKETCH ════════════════════════════════════════════════════
+    story.append(banner("FLOOR PLAN / SKETCH"))
+    story.append(Spacer(1, 0.12*inch))
+
+    sketch_row = Table([[
+        Table([[Paragraph("Above Grade", S("sktl", fontName="Helvetica-Bold", fontSize=8,
+                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_sketch_ag") or ss.get("rb_sketch_ag_file"), 3.4*inch, 3.0*inch, "[ ABOVE GRADE FLOOR PLAN ]")]],
+              colWidths=[3.5*inch]),
+        Table([[Paragraph("Basement / Below Grade", S("sktl2", fontName="Helvetica-Bold",
+                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_sketch_bg") or ss.get("rb_sketch_bg_file"), 3.4*inch, 3.0*inch, "[ BASEMENT FLOOR PLAN ]")]],
+              colWidths=[3.5*inch]),
+    ]], colWidths=[3.6*inch, 3.6*inch])
+    sketch_row.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
+    ]))
+    story.append(sketch_row)
+    story.append(PageBreak())
+
+    # ══ PAGE 8: SCOPE & LIMITING CONDITIONS ═══════════════════════════════
+    story.append(banner("SCOPE OF WORK"))
+    story.append(Spacer(1, 0.1*inch))
+    sow = ss.get("rb_scope_of_work","")
+    if sow:
+        story.append(Paragraph(sow, body))
+
+    story.append(Spacer(1, 0.15*inch))
+    story.append(sub_banner("LIMITING CONDITIONS"))
+    story.append(Spacer(1, 0.1*inch))
+
+    lc_text = ss.get("rb_limiting_conditions","")
+    for para in lc_text.split("\n\n"):
+        if para.strip():
+            story.append(Paragraph(para.strip(), body))
+    story.append(PageBreak())
+
+    # ══ FINAL PAGE: CERTIFICATION & SIGNATURE ═════════════════════════════
+    story.append(banner("APPRAISER CERTIFICATION & SIGNATURE"))
+    story.append(Spacer(1, 0.15*inch))
+
+    # USPAP certification text
+    cert_text = (
+        "I certify that, to the best of my knowledge and belief: the statements of fact contained in this "
+        "report are true and correct; the reported analyses, opinions, and conclusions are limited only by "
+        "the reported assumptions and limiting conditions and are my personal, impartial, and unbiased "
+        "professional analyses, opinions, and conclusions; I have no present or prospective interest in the "
+        "property that is the subject of this report; my engagement in this assignment was not contingent "
+        "upon developing or reporting predetermined results; my compensation is not contingent upon the "
+        "development or reporting of a predetermined value; and this report was prepared in conformity with "
+        "the Uniform Standards of Professional Appraisal Practice."
+    )
+    story.append(Paragraph(cert_text, body))
+    story.append(Spacer(1, 0.15*inch))
+
+    rpt_date  = ss.get("rb_report_date","")
+    insp_date = ss.get("rb_inspection_date","")
+    insp_type = ss.get("rb_inspection_type","Interior & Exterior")
+
+    sig_left = Table([
+        [Paragraph("APPRAISER", fl)],
+        [Spacer(1, 0.35*inch)],
+        [HRFlowable(width=2.8*inch, thickness=0.75, color=BLACK)],
+        [Paragraph("Spencer Webb", S("sn3", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))],
+        [Paragraph("A-Tech Appraisal Co., LLC", fv)],
+        [Paragraph("License #CRA.0060031  |  State of Rhode Island", fv)],
+        [Paragraph("Expires: 05/03/2026", fv)],
+        [Paragraph(f"Date of Report: {rpt_date}", fv)],
+        [Paragraph(f"Inspection: {insp_type}  |  {insp_date}", fv)],
+        [Spacer(1, 0.12*inch)],
+        [Paragraph("CLIENT / INTENDED USER", fl)],
+        [Paragraph(ss.get("rb_intended_user",""), S("cn3", fontName="Helvetica-Bold",
+                    fontSize=11, textColor=BLACK))],
+    ], colWidths=[3.4*inch])
+    sig_left.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
+    ]))
+
+    lic_file = ss.get("rb_photo_bytes_license") or ss.get("rb_license_file")
+    lic_img  = img_cell(lic_file, 3.3*inch, 2.3*inch, "[ APPRAISER LICENSE ]")
+    lic_note = Paragraph(
+        "Rhode Island Department of Business Regulation\nDivision of Commercial Licensing",
+        S("ln2", fontName="Helvetica", fontSize=7.5, textColor=MID_GRAY,
+          alignment=TA_CENTER, leading=11, spaceBefore=5))
+
+    sig_right = Table([
+        [Paragraph("STATE LICENSE", S("ll2", fontName="Helvetica-Bold", fontSize=8,
+                    textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=6))],
+        [lic_img],
+        [lic_note],
+    ], colWidths=[3.5*inch])
+    sig_right.setStyle(TableStyle([
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
+    ]))
+
+    story.append(Table([[sig_left, sig_right]], colWidths=[3.6*inch, 3.6*inch]))
+
+    def footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(MID_GRAY)
+        canvas.drawString(0.65*inch, 0.38*inch,
+            f"A-Tech Appraisal Co., LLC  |  CRA.0060031  |  {addr1}, {addr2}  |  Confidential Appraisal Report")
+        canvas.drawRightString(W-0.65*inch, 0.38*inch, f"Page {doc.page}")
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    buf.seek(0)
+    return buf.read()
+
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_report = st.tabs([
     "📋 Revision Responses",
@@ -1411,12 +2041,15 @@ The appraisal profession is going through its biggest technology shift in decade
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — REPORT BUILDER (GP RESIDENTIAL)
 # ══════════════════════════════════════════════════════════════════════════════
+
 with tab_report:
     st.markdown("## 🏠 GP Residential Report Builder")
     st.caption("Build a clean client-facing appraisal report section by section. Pull saved language from your library or type fresh. Generate PDF when complete.")
     st.divider()
 
-    # ── Session state init ─────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════
+    # SESSION STATE INIT
+    # ══════════════════════════════════════════════════════════════════════
     def rb_init(key, default):
         if f"rb_{key}" not in st.session_state:
             st.session_state[f"rb_{key}"] = default
@@ -1444,12 +2077,19 @@ with tab_report:
     rb_init("basement_sf", "")
     rb_init("basement_fin_sf", "")
     rb_init("basement_fin_rooms", "")
+    rb_init("fireplace_count", "0")
+    rb_init("woodstove_count", "0")
     rb_init("amenities", [])
     rb_init("lot_size", "")
     rb_init("parking", "1 Car Garage")
     rb_init("zoning", "")
     rb_init("zoning_req", "")
     rb_init("zoning_comments", "Legal")
+    rb_init("electricity", True)
+    rb_init("heating_fuel", "Gas")
+    rb_init("water_type", "Public")
+    rb_init("sewer_type", "Sewer")
+    rb_init("hbu_comment", "The highest and best use is a single family dwelling.")
     rb_init("condition_narrative", "")
     rb_init("condition_rating", "Average-Above")
     rb_init("quality_rating", "Average")
@@ -1465,6 +2105,7 @@ with tab_report:
     rb_init("age_low", "")
     rb_init("age_high", "")
     rb_init("age_pred", "")
+    rb_init("num_comps", 3)
     rb_init("reconciliation", "")
     rb_init("scope_of_work", "The appraiser performed an interior and exterior inspection of the subject property at the client's request. A thorough investigation of available data was completed including public records, multiple listing services, brokers, owners, the inspection of the subject property itself, and other qualified sources where applicable. When conflicting information was collected, the source deemed most reliable by industry standards was utilized. All dimensions taken from assessor's field card of subject.")
     rb_init("limiting_conditions", "Not a Home Inspection: This appraisal is not a home inspection. The appraiser performed a visual inspection of accessible areas only and cannot be relied upon to disclose conditions or defects. A professional home inspection is recommended.\n\nAdverse Environmental Conditions: No apparent adverse environmental conditions were observed on the date of inspection. The presence of hazardous substances such as radon or lead paint cannot be determined during an appraisal inspection.\n\nAge Adjustments: Comparables were not adjusted for actual age differences. In this market, buyers base purchase decisions on condition rather than actual age. Condition ratings reflect effective age.\n\nMechanical Systems: Heating, plumbing, and electrical systems appear in proper working order based on visual observation only.")
@@ -1472,7 +2113,68 @@ with tab_report:
     rb_init("inspection_date", date.today().isoformat())
     rb_init("report_date", date.today().isoformat())
 
-    # ── Section navigation ─────────────────────────────────────────────────
+    # Photo bytes storage — persists across section switches
+    def save_photo(key, file_obj):
+        """Save uploaded file bytes to session state so they survive section switches."""
+        if file_obj is not None:
+            file_obj.seek(0)
+            st.session_state[f"rb_photo_bytes_{key}"] = file_obj.read()
+            st.session_state[f"rb_photo_name_{key}"] = file_obj.name
+
+    def get_photo_bytes(key):
+        return st.session_state.get(f"rb_photo_bytes_{key}")
+
+    def show_saved_photo(key, caption="", width=None):
+        b = get_photo_bytes(key)
+        if b:
+            st.image(b, caption=caption, use_container_width=(width is None))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SAVE / LOAD PROGRESS
+    # ══════════════════════════════════════════════════════════════════════
+    SAVE_DIR = os.path.join(os.path.dirname(__file__), "rb_saves")
+    os.makedirs(SAVE_DIR, exist_ok=True)
+
+    with st.expander("💾 Save / Load Report Progress"):
+        sv_col1, sv_col2 = st.columns(2)
+        with sv_col1:
+            save_name = st.text_input("Save name (e.g. client name or address)",
+                                       key="rb_save_name",
+                                       placeholder="e.g. 8 Sarasota Ave")
+            if st.button("Save Progress"):
+                if save_name:
+                    save_data = {k.replace("rb_",""): v
+                                 for k, v in st.session_state.items()
+                                 if k.startswith("rb_") and not k.startswith("rb_photo_bytes")}
+                    fpath = os.path.join(SAVE_DIR, f"{save_name.replace(' ','_')}.json")
+                    with open(fpath, "w") as f:
+                        json.dump(save_data, f)
+                    st.success(f"Saved: {save_name}")
+                else:
+                    st.warning("Enter a save name first.")
+
+        with sv_col2:
+            saves = [f.replace(".json","").replace("_"," ")
+                     for f in os.listdir(SAVE_DIR) if f.endswith(".json")]
+            if saves:
+                load_choice = st.selectbox("Load saved report", ["— select —"] + saves,
+                                            key="rb_load_choice")
+                if st.button("Load") and load_choice != "— select —":
+                    fpath = os.path.join(SAVE_DIR, f"{load_choice.replace(' ','_')}.json")
+                    with open(fpath) as f:
+                        loaded = json.load(f)
+                    for k, v in loaded.items():
+                        st.session_state[f"rb_{k}"] = v
+                    st.success(f"Loaded: {load_choice}")
+                    st.rerun()
+            else:
+                st.caption("No saved reports yet.")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION NAVIGATION — use index-based to avoid startswith("1") bug
+    # ══════════════════════════════════════════════════════════════════════
     sections = [
         "1 · Cover & Assignment",
         "2 · Improvements",
@@ -1486,23 +2188,27 @@ with tab_report:
         "10 · Limiting Conditions",
         "11 · Certification & Signature",
     ]
-    active = st.selectbox("Jump to section", sections, key="rb_section")
+    active_idx = st.selectbox("Jump to section", range(len(sections)),
+                               format_func=lambda i: sections[i],
+                               key="rb_section_idx")
     st.divider()
 
-    # Helper: library pull button
+    # ── Library pull helper ────────────────────────────────────────────
     def lib_pull(label, lib_items, target_key):
-        """Show saved library items as clickable insert buttons."""
         if lib_items:
             with st.expander(f"📚 Insert from library — {label}"):
                 for item in lib_items:
                     cat = item.get("category","") or item.get("city","") or ""
                     txt = item.get("text","") or item.get("description","") or ""
-                    if st.button(f"↩ {cat[:60]}", key=f"lib_{target_key}_{item.get('id',cat[:10])}"):
+                    if st.button(f"↩ {cat[:60]}",
+                                  key=f"lib_{target_key}_{item.get('id',cat[:10])}"):
                         st.session_state[f"rb_{target_key}"] = txt
                         st.rerun()
 
-    # ── SECTION 1: COVER & ASSIGNMENT ─────────────────────────────────────
-    if active.startswith("1"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 1 — COVER & ASSIGNMENT
+    # ══════════════════════════════════════════════════════════════════════
+    if active_idx == 0:
         st.markdown("### Cover & Assignment Summary")
 
         col1, col2 = st.columns(2)
@@ -1528,12 +2234,12 @@ with tab_report:
                 "Intended User", st.session_state.rb_intended_user)
             st.session_state.rb_property_type = st.selectbox(
                 "Property Type",
-                ["Single Family", "Condominium", "2-4 Unit", "Vacant Land"],
+                ["Single Family","Condominium","2-4 Unit","Vacant Land"],
                 index=["Single Family","Condominium","2-4 Unit","Vacant Land"].index(
                     st.session_state.rb_property_type))
             st.session_state.rb_property_rights = st.selectbox(
                 "Property Rights",
-                ["Fee Simple", "Leasehold", "Leased Fee"],
+                ["Fee Simple","Leasehold","Leased Fee"],
                 index=["Fee Simple","Leasehold","Leased Fee"].index(
                     st.session_state.rb_property_rights))
             col_ty, col_ta = st.columns(2)
@@ -1547,56 +2253,54 @@ with tab_report:
 
         st.divider()
         st.markdown("**Subject Photos**")
-        st.caption("Upload front, rear, and street scene. Additional interior photos added in Section 2.")
         cp1, cp2, cp3 = st.columns(3)
         with cp1:
-            st.session_state["rb_photo_front"] = st.file_uploader(
-                "Front Exterior", type=["jpg","jpeg","png"], key="up_front")
-            if st.session_state.get("rb_photo_front"):
-                st.image(st.session_state["rb_photo_front"], use_container_width=True)
+            f = st.file_uploader("Front Exterior", type=["jpg","jpeg","png"], key="up_front")
+            if f:
+                save_photo("front", f)
+            show_saved_photo("front", "Front")
         with cp2:
-            st.session_state["rb_photo_rear"] = st.file_uploader(
-                "Rear Exterior", type=["jpg","jpeg","png"], key="up_rear")
-            if st.session_state.get("rb_photo_rear"):
-                st.image(st.session_state["rb_photo_rear"], use_container_width=True)
+            f = st.file_uploader("Rear Exterior", type=["jpg","jpeg","png"], key="up_rear")
+            if f:
+                save_photo("rear", f)
+            show_saved_photo("rear", "Rear")
         with cp3:
-            st.session_state["rb_photo_street"] = st.file_uploader(
-                "Street Scene", type=["jpg","jpeg","png"], key="up_street")
-            if st.session_state.get("rb_photo_street"):
-                st.image(st.session_state["rb_photo_street"], use_container_width=True)
+            f = st.file_uploader("Street Scene", type=["jpg","jpeg","png"], key="up_street")
+            if f:
+                save_photo("street", f)
+            show_saved_photo("street", "Street")
 
-    # ── SECTION 2: IMPROVEMENTS ───────────────────────────────────────────
-    elif active.startswith("2"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 2 — IMPROVEMENTS
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 1:
         st.markdown("### Improvements Description")
 
         col1, col2, col3 = st.columns(3)
         with col1:
             st.session_state.rb_style_attach = st.selectbox(
-                "Attached/Detached", ["Detached", "Attached"],
+                "Attached/Detached", ["Detached","Attached"],
                 index=["Detached","Attached"].index(st.session_state.rb_style_attach))
             st.session_state.rb_style_floors = st.selectbox(
-                "Number of Floors", ["1", "1.5", "2", "2.5", "3", "Split Level"],
+                "Number of Floors", ["1","1.5","2","2.5","3","Split Level"],
                 index=["1","1.5","2","2.5","3","Split Level"].index(
-                    st.session_state.rb_style_floors))
+                    st.session_state.rb_style_floors)
+                    if st.session_state.rb_style_floors in
+                    ["1","1.5","2","2.5","3","Split Level"] else 0)
+            style_opts = ["Ranch","Cape Cod","Colonial","Raised Ranch","Split Level",
+                          "Contemporary","Victorian","Bungalow","Craftsman","Tudor",
+                          "Gambrel","Other"]
             st.session_state.rb_style_type = st.selectbox(
-                "House Style",
-                ["Ranch","Cape Cod","Colonial","Raised Ranch","Split Level",
-                 "Contemporary","Victorian","Bungalow","Craftsman","Tudor",
-                 "Gambrel","Other"],
-                index=["Ranch","Cape Cod","Colonial","Raised Ranch","Split Level",
-                 "Contemporary","Victorian","Bungalow","Craftsman","Tudor",
-                 "Gambrel","Other"].index(st.session_state.rb_style_type)
-                 if st.session_state.rb_style_type in
-                 ["Ranch","Cape Cod","Colonial","Raised Ranch","Split Level",
-                  "Contemporary","Victorian","Bungalow","Craftsman","Tudor",
-                  "Gambrel","Other"] else 0)
+                "House Style", style_opts,
+                index=style_opts.index(st.session_state.rb_style_type)
+                      if st.session_state.rb_style_type in style_opts else 0)
         with col2:
             st.session_state.rb_year_built = st.text_input(
                 "Year Built", st.session_state.rb_year_built)
             st.session_state.rb_gla = st.text_input(
                 "Gross Living Area (sq ft)", st.session_state.rb_gla)
             st.session_state.rb_total_rooms = st.text_input(
-                "Total Rooms", st.session_state.rb_total_rooms)
+                "Total Rooms (above grade)", st.session_state.rb_total_rooms)
         with col3:
             st.session_state.rb_bedrooms = st.text_input(
                 "Bedrooms", st.session_state.rb_bedrooms)
@@ -1606,14 +2310,55 @@ with tab_report:
                 "Half Baths", st.session_state.rb_bathrooms_half)
 
         st.divider()
+        st.markdown("**Utilities & Mechanical**")
+        uc1, uc2, uc3, uc4 = st.columns(4)
+        with uc1:
+            st.session_state.rb_electricity = st.checkbox(
+                "Electricity", value=st.session_state.rb_electricity)
+            st.session_state.rb_heating_fuel = st.selectbox(
+                "Heating Fuel",
+                ["Gas","Oil","Electric","Propane","Solar","Other"],
+                index=["Gas","Oil","Electric","Propane","Solar","Other"].index(
+                    st.session_state.rb_heating_fuel)
+                    if st.session_state.rb_heating_fuel in
+                    ["Gas","Oil","Electric","Propane","Solar","Other"] else 0)
+        with uc2:
+            st.session_state.rb_water_type = st.selectbox(
+                "Water", ["Public","Well","Other"],
+                index=["Public","Well","Other"].index(st.session_state.rb_water_type)
+                      if st.session_state.rb_water_type in ["Public","Well","Other"] else 0)
+            st.session_state.rb_sewer_type = st.selectbox(
+                "Sanitary Sewer", ["Sewer","Septic","Cesspool","Other"],
+                index=["Sewer","Septic","Cesspool","Other"].index(
+                    st.session_state.rb_sewer_type)
+                    if st.session_state.rb_sewer_type in
+                    ["Sewer","Septic","Cesspool","Other"] else 0)
+        with uc3:
+            st.session_state.rb_fireplace_count = st.selectbox(
+                "Fireplaces", ["0","1","2","3","4"],
+                index=["0","1","2","3","4"].index(
+                    str(st.session_state.rb_fireplace_count))
+                    if str(st.session_state.rb_fireplace_count) in
+                    ["0","1","2","3","4"] else 0)
+        with uc4:
+            st.session_state.rb_woodstove_count = st.selectbox(
+                "Woodstoves", ["0","1","2","3"],
+                index=["0","1","2","3"].index(
+                    str(st.session_state.rb_woodstove_count))
+                    if str(st.session_state.rb_woodstove_count) in
+                    ["0","1","2","3"] else 0)
+
+        st.divider()
         st.markdown("**Basement**")
         bc1, bc2, bc3, bc4 = st.columns(4)
         with bc1:
             st.session_state.rb_basement_type = st.selectbox(
                 "Basement Type",
-                ["Full", "Partial", "Crawl Space", "Slab", "None"],
+                ["Full","Partial","Crawl Space","Slab","None"],
                 index=["Full","Partial","Crawl Space","Slab","None"].index(
-                    st.session_state.rb_basement_type))
+                    st.session_state.rb_basement_type)
+                    if st.session_state.rb_basement_type in
+                    ["Full","Partial","Crawl Space","Slab","None"] else 0)
         with bc2:
             st.session_state.rb_basement_sf = st.text_input(
                 "Basement SF", st.session_state.rb_basement_sf)
@@ -1626,15 +2371,11 @@ with tab_report:
 
         st.divider()
         st.markdown("**Amenities**")
-        amenity_options = [
-            "Fireplace","Woodstove","Deck","Patio","Open Porch",
-            "Enclosed Porch","Screen Porch","In-Ground Pool",
-            "Above-Ground Pool","Solar","ADU","Outbuilding"
-        ]
+        amenity_opts = ["Deck","Patio","Open Porch","Enclosed Porch","Screen Porch",
+                        "In-Ground Pool","Above-Ground Pool","Solar","ADU","Outbuilding"]
         st.session_state.rb_amenities = st.multiselect(
-            "Select all that apply",
-            amenity_options,
-            default=st.session_state.rb_amenities)
+            "Select all that apply", amenity_opts,
+            default=[a for a in st.session_state.rb_amenities if a in amenity_opts])
 
         st.divider()
         st.markdown("**Site & Parking**")
@@ -1643,18 +2384,13 @@ with tab_report:
             st.session_state.rb_lot_size = st.text_input(
                 "Lot Size", st.session_state.rb_lot_size,
                 placeholder="e.g. 9,100 sf or 0.45 acres")
+            parking_opts = ["Street","Off Street","1 Car Garage","2 Car Garage",
+                            "3 Car Garage","Carport","1 Car Attached","2 Car Attached",
+                            "1 Car Detached","2 Car Detached"]
             st.session_state.rb_parking = st.selectbox(
-                "Parking",
-                ["Street","Off Street","1 Car Garage","2 Car Garage",
-                 "3 Car Garage","Carport","1 Car Attached","2 Car Attached",
-                 "1 Car Detached","2 Car Detached"],
-                index=["Street","Off Street","1 Car Garage","2 Car Garage",
-                 "3 Car Garage","Carport","1 Car Attached","2 Car Attached",
-                 "1 Car Detached","2 Car Detached"].index(st.session_state.rb_parking)
-                 if st.session_state.rb_parking in
-                 ["Street","Off Street","1 Car Garage","2 Car Garage",
-                  "3 Car Garage","Carport","1 Car Attached","2 Car Attached",
-                  "1 Car Detached","2 Car Detached"] else 0)
+                "Parking", parking_opts,
+                index=parking_opts.index(st.session_state.rb_parking)
+                      if st.session_state.rb_parking in parking_opts else 0)
         with sc2:
             st.session_state.rb_zoning = st.text_input(
                 "Zoning Classification", st.session_state.rb_zoning,
@@ -1662,76 +2398,113 @@ with tab_report:
             st.session_state.rb_zoning_req = st.text_input(
                 "Zoning Requirements", st.session_state.rb_zoning_req,
                 placeholder="e.g. 100' Frontage / 20,000 sf min")
+            zc_opts = ["Legal","Legal Non-Conforming","Illegal","No Zoning"]
             st.session_state.rb_zoning_comments = st.selectbox(
-                "Zoning Compliance",
-                ["Legal","Legal Non-Conforming","Illegal","No Zoning"],
-                index=["Legal","Legal Non-Conforming","Illegal","No Zoning"].index(
-                    st.session_state.rb_zoning_comments)
-                    if st.session_state.rb_zoning_comments in
-                    ["Legal","Legal Non-Conforming","Illegal","No Zoning"] else 0)
+                "Zoning Compliance", zc_opts,
+                index=zc_opts.index(st.session_state.rb_zoning_comments)
+                      if st.session_state.rb_zoning_comments in zc_opts else 0)
 
-        # ── Dynamic photo uploads based on room count ──────────────────────
+        # Save zoning to library
+        if st.session_state.rb_zoning and st.session_state.rb_address2:
+            if st.button("💾 Save Zoning to Library"):
+                zones = load_data("zoning_data","rc_zoning.json",[])
+                city_part = st.session_state.rb_address2.split(",")[0].strip()
+                new_entry = {
+                    "id": f"z_{len(zones)+1}",
+                    "city": city_part,
+                    "district": st.session_state.rb_zoning,
+                    "property_type": st.session_state.rb_property_type,
+                    "frontage": "", "lot_area": st.session_state.rb_lot_size,
+                    "lot_width":"","front_yard":"","side_yard":"","rear_yard":"",
+                    "max_height":"","lot_coverage":"","stories":"",
+                    "notes": st.session_state.rb_zoning_req
+                }
+                zones.append(new_entry)
+                save_data("zoning_data","rc_zoning.json", zones)
+                st.success("Zoning saved to library.")
+
         st.divider()
         st.markdown("**Interior Room Photos**")
+        st.caption("Slots auto-generate based on room counts. Label each room and upload a photo.")
 
         try:
             n_rooms = int(st.session_state.rb_total_rooms or 0)
+            n_full  = int(st.session_state.rb_bathrooms_full or 0)
+            n_half  = int(st.session_state.rb_bathrooms_half or 0)
             n_bsmt  = int(st.session_state.rb_basement_fin_rooms or 0)
         except ValueError:
-            n_rooms = 0
-            n_bsmt  = 0
+            n_rooms = n_full = n_half = n_bsmt = 0
 
         if n_rooms > 0:
-            st.caption(f"{n_rooms} above-grade rooms detected — upload a photo for each.")
-            room_labels = ["Kitchen","Living Room","Dining Room","Primary Bedroom",
-                           "Bedroom 2","Bedroom 3","Bedroom 4","Den","Office",
-                           "Sunroom","Family Room","Other Room"]
+            st.markdown(f"**Above Grade Rooms ({n_rooms})**")
+            room_labels_default = ["Kitchen","Living Room","Dining Room",
+                                    "Primary Bedroom","Bedroom 2","Bedroom 3",
+                                    "Bedroom 4","Den","Office","Family Room",
+                                    "Sunroom","Other Room"]
             cols_per_row = 3
-            room_photos = []
             for i in range(n_rooms):
                 if i % cols_per_row == 0:
                     photo_cols = st.columns(cols_per_row)
-                label = room_labels[i] if i < len(room_labels) else f"Room {i+1}"
+                label_default = room_labels_default[i] if i < len(room_labels_default) else f"Room {i+1}"
                 with photo_cols[i % cols_per_row]:
-                    default_label = st.text_input(
-                        f"Room {i+1} Label", label,
-                        key=f"rb_room_label_{i}")
-                    uploaded = st.file_uploader(
-                        f"Photo — {default_label}",
-                        type=["jpg","jpeg","png"],
-                        key=f"rb_room_photo_{i}")
-                    if uploaded:
-                        st.image(uploaded, use_container_width=True)
-                    room_photos.append({"label": default_label, "file": uploaded})
-            st.session_state["rb_room_photos"] = room_photos
+                    lbl_key = f"rb_room_label_{i}"
+                    if lbl_key not in st.session_state:
+                        st.session_state[lbl_key] = label_default
+                    st.session_state[lbl_key] = st.text_input(
+                        f"Room {i+1} Label", st.session_state[lbl_key],
+                        key=f"room_lbl_input_{i}")
+                    f = st.file_uploader(f"Photo — {st.session_state[lbl_key]}",
+                                          type=["jpg","jpeg","png"],
+                                          key=f"room_photo_up_{i}")
+                    if f:
+                        save_photo(f"room_{i}", f)
+                    show_saved_photo(f"room_{i}", st.session_state[lbl_key])
+
+        if n_full > 0 or n_half > 0:
+            total_baths = n_full + n_half
+            st.markdown(f"**Bathroom Photos ({total_baths})**")
+            for i in range(total_baths):
+                if i % 3 == 0:
+                    bath_cols = st.columns(3)
+                bath_label = f"Full Bath {i+1}" if i < n_full else f"Half Bath {i-n_full+1}"
+                with bath_cols[i % 3]:
+                    f = st.file_uploader(f"Photo — {bath_label}",
+                                          type=["jpg","jpeg","png"],
+                                          key=f"bath_photo_up_{i}")
+                    if f:
+                        save_photo(f"bath_{i}", f)
+                    show_saved_photo(f"bath_{i}", bath_label)
 
         if n_bsmt > 0:
-            st.markdown(f"**Basement Room Photos** ({n_bsmt} finished rooms)")
-            bsmt_photos = []
+            st.markdown(f"**Basement Room Photos ({n_bsmt})**")
             for i in range(n_bsmt):
                 if i % 3 == 0:
                     b_cols = st.columns(3)
                 with b_cols[i % 3]:
-                    bl = st.text_input(f"Basement Room {i+1} Label",
-                                        f"Basement Room {i+1}",
-                                        key=f"rb_bsmt_label_{i}")
-                    bu = st.file_uploader(f"Photo — {bl}",
-                                           type=["jpg","jpeg","png"],
-                                           key=f"rb_bsmt_photo_{i}")
-                    if bu:
-                        st.image(bu, use_container_width=True)
-                    bsmt_photos.append({"label": bl, "file": bu})
-            st.session_state["rb_bsmt_photos"] = bsmt_photos
+                    bl_key = f"rb_bsmt_label_{i}"
+                    if bl_key not in st.session_state:
+                        st.session_state[bl_key] = f"Basement Room {i+1}"
+                    st.session_state[bl_key] = st.text_input(
+                        f"Basement Room {i+1} Label",
+                        st.session_state[bl_key],
+                        key=f"bsmt_lbl_{i}")
+                    f = st.file_uploader(f"Photo — {st.session_state[bl_key]}",
+                                          type=["jpg","jpeg","png"],
+                                          key=f"bsmt_photo_up_{i}")
+                    if f:
+                        save_photo(f"bsmt_{i}", f)
+                    show_saved_photo(f"bsmt_{i}", st.session_state[bl_key])
 
         if n_rooms == 0:
-            st.info("Enter Total Rooms above to activate dynamic photo uploads.")
+            st.info("Enter Total Rooms above to activate photo upload slots.")
 
-    # ── SECTION 3: CONDITION & RATING ─────────────────────────────────────
-    elif active.startswith("3"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 3 — PROPERTY DESCRIPTION & RATING
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 2:
         st.markdown("### Property Description & Rating")
 
-        neighborhoods = load_data("neighborhoods_data", "rc_neighborhoods.json", [])
-        comments = load_data("comments_data", "rc_comments.json", DEFAULT_COMMENTS)
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
         cond_comments = [c for c in comments if any(x in c["category"]
                          for x in ["C1","C2","C3","C4","C5","C6","Condition"])]
         lib_pull("Condition Comments", cond_comments, "condition_narrative")
@@ -1740,54 +2513,66 @@ with tab_report:
             "Condition & Updates Narrative",
             st.session_state.rb_condition_narrative,
             height=160,
-            placeholder="Describe the condition, recent updates, and any items noted at inspection...")
+            placeholder="Describe the condition, recent updates, and items noted at inspection...")
 
         col1, col2 = st.columns(2)
+        cond_opts = ["C1 — New","C2 — Remodeled","C3 — Updated","C4 — Average",
+                     "C5 — Fair","C6 — Poor","Average","Average-Above",
+                     "Above Average","Below Average","Good"]
+        qual_opts = ["Q1 — Exceptional","Q2 — High Quality","Q3 — Good","Q4 — Average",
+                     "Q5 — Fair","Q6 — Poor","Average","Average-Above",
+                     "Above Average","Below Average","Good"]
         with col1:
             st.session_state.rb_condition_rating = st.selectbox(
-                "Overall Condition Rating",
-                ["C1 — New","C2 — Remodeled","C3 — Updated",
-                 "C4 — Average","C5 — Fair","C6 — Poor",
-                 "Average","Average-Above","Above Average","Below Average","Good"],
-                index=["C1 — New","C2 — Remodeled","C3 — Updated",
-                 "C4 — Average","C5 — Fair","C6 — Poor",
-                 "Average","Average-Above","Above Average","Below Average","Good"].index(
-                    st.session_state.rb_condition_rating)
-                    if st.session_state.rb_condition_rating in
-                    ["C1 — New","C2 — Remodeled","C3 — Updated",
-                     "C4 — Average","C5 — Fair","C6 — Poor",
-                     "Average","Average-Above","Above Average","Below Average","Good"] else 0)
+                "Condition Rating", cond_opts,
+                index=cond_opts.index(st.session_state.rb_condition_rating)
+                      if st.session_state.rb_condition_rating in cond_opts else 0)
         with col2:
             st.session_state.rb_quality_rating = st.selectbox(
-                "Overall Quality Rating",
-                ["Q1 — Exceptional","Q2 — High Quality","Q3 — Good",
-                 "Q4 — Average","Q5 — Fair","Q6 — Poor",
-                 "Average","Average-Above","Above Average","Below Average","Good"],
-                index=["Q1 — Exceptional","Q2 — High Quality","Q3 — Good",
-                 "Q4 — Average","Q5 — Fair","Q6 — Poor",
-                 "Average","Average-Above","Above Average","Below Average","Good"].index(
-                    st.session_state.rb_quality_rating)
-                    if st.session_state.rb_quality_rating in
-                    ["Q1 — Exceptional","Q2 — High Quality","Q3 — Good",
-                     "Q4 — Average","Q5 — Fair","Q6 — Poor",
-                     "Average","Average-Above","Above Average","Below Average","Good"] else 0)
+                "Quality Rating", qual_opts,
+                index=qual_opts.index(st.session_state.rb_quality_rating)
+                      if st.session_state.rb_quality_rating in qual_opts else 0)
 
-    # ── SECTION 4: NEIGHBORHOOD & MARKET ──────────────────────────────────
-    elif active.startswith("4"):
+        st.divider()
+        st.markdown("**Highest & Best Use**")
+        st.session_state.rb_hbu_comment = st.text_input(
+            "Highest & Best Use Statement",
+            st.session_state.rb_hbu_comment)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 4 — NEIGHBORHOOD & MARKET
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 3:
         st.markdown("### Neighborhood & Market Description")
 
-        neighborhoods = load_data("neighborhoods_data", "rc_neighborhoods.json", [])
+        neighborhoods = load_data("neighborhoods_data","rc_neighborhoods.json",[])
         lib_pull("Neighborhood Descriptions", neighborhoods, "neighborhood_desc")
+
         st.session_state.rb_neighborhood_desc = st.text_area(
             "Neighborhood Description",
             st.session_state.rb_neighborhood_desc,
             height=120)
 
-        comments = load_data("comments_data", "rc_comments.json", DEFAULT_COMMENTS)
-        mkt_comments = [c for c in comments if "market" in c["category"].lower()
-                        or "supply" in c["category"].lower()
-                        or "marketing" in c["category"].lower()]
+        # Save neighborhood to library
+        if st.session_state.rb_neighborhood_desc and st.session_state.rb_address2:
+            if st.button("💾 Save Neighborhood Description to Library"):
+                hoods = load_data("neighborhoods_data","rc_neighborhoods.json",[])
+                city_part = st.session_state.rb_address2.split(",")[0].strip()
+                new_hood = {
+                    "id": f"n_{len(hoods)+1}",
+                    "city": city_part,
+                    "neighborhood": city_part,
+                    "description": st.session_state.rb_neighborhood_desc
+                }
+                hoods.append(new_hood)
+                save_data("neighborhoods_data","rc_neighborhoods.json", hoods)
+                st.success("Neighborhood description saved to library.")
+
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
+        mkt_comments = [c for c in comments if any(x in c["category"].lower()
+                         for x in ["market","supply","marketing"])]
         lib_pull("Market Condition Comments", mkt_comments, "market_desc")
+
         st.session_state.rb_market_desc = st.text_area(
             "Market Description / Supply & Demand Commentary",
             st.session_state.rb_market_desc,
@@ -1795,70 +2580,72 @@ with tab_report:
             placeholder="Describe market conditions, supply/demand, and marketing time support...")
 
         st.divider()
-        st.markdown("**Market Condition Checkboxes**")
+        st.markdown("**Market Condition Summary**")
         mc1, mc2, mc3, mc4 = st.columns(4)
         with mc1:
+            mc_opts = ["Increasing","Stable","Declining"]
             st.session_state.rb_market_conditions = st.selectbox(
-                "Market Conditions", ["Increasing","Stable","Declining"],
-                index=["Increasing","Stable","Declining"].index(
-                    st.session_state.rb_market_conditions)
-                    if st.session_state.rb_market_conditions in
-                    ["Increasing","Stable","Declining"] else 1)
+                "Market Conditions", mc_opts,
+                index=mc_opts.index(st.session_state.rb_market_conditions)
+                      if st.session_state.rb_market_conditions in mc_opts else 1)
         with mc2:
+            sd_opts = ["Shortage","In Balance","Over Supply"]
             st.session_state.rb_supply_demand = st.selectbox(
-                "Supply / Demand",
-                ["Shortage","In Balance","Over Supply"],
-                index=["Shortage","In Balance","Over Supply"].index(
-                    st.session_state.rb_supply_demand)
-                    if st.session_state.rb_supply_demand in
-                    ["Shortage","In Balance","Over Supply"] else 0)
+                "Supply / Demand", sd_opts,
+                index=sd_opts.index(st.session_state.rb_supply_demand)
+                      if st.session_state.rb_supply_demand in sd_opts else 0)
         with mc3:
+            mt_opts = ["Under 3 Months","3-6 Months","Over 6 Months"]
             st.session_state.rb_marketing_time = st.selectbox(
-                "Marketing Time",
-                ["Under 3 Months","3-6 Months","Over 6 Months"],
-                index=["Under 3 Months","3-6 Months","Over 6 Months"].index(
-                    st.session_state.rb_marketing_time)
-                    if st.session_state.rb_marketing_time in
-                    ["Under 3 Months","3-6 Months","Over 6 Months"] else 0)
+                "Marketing Time", mt_opts,
+                index=mt_opts.index(st.session_state.rb_marketing_time)
+                      if st.session_state.rb_marketing_time in mt_opts else 0)
         with mc4:
+            gr_opts = ["Rapid","Stable","Slow"]
             st.session_state.rb_growth_rate = st.selectbox(
-                "Growth Rate", ["Rapid","Stable","Slow"],
-                index=["Rapid","Stable","Slow"].index(
-                    st.session_state.rb_growth_rate)
-                    if st.session_state.rb_growth_rate in
-                    ["Rapid","Stable","Slow"] else 1)
+                "Growth Rate", gr_opts,
+                index=gr_opts.index(st.session_state.rb_growth_rate)
+                      if st.session_state.rb_growth_rate in gr_opts else 1)
 
         st.divider()
-        st.markdown("**Housing Unit Trends — Manual Entry or CSV Upload**")
+        st.markdown("**Housing Unit Trends — CSV Upload or Manual Entry**")
         housing_csv = st.file_uploader(
             "Upload Housing Trends CSV (from MLS/Spark)",
             type=["csv"], key="rb_housing_csv")
 
         if housing_csv:
             try:
-                df = pd.read_csv(housing_csv)
-                st.dataframe(df.head(10))
-                st.caption("CSV loaded — map fields below")
-                cols = ["(select)"] + list(df.columns)
+                df_h = pd.read_csv(housing_csv)
+                st.dataframe(df_h.head(10))
+                hcols = ["(select)"] + list(df_h.columns)
                 hc1, hc2, hc3 = st.columns(3)
                 with hc1:
-                    price_col = st.selectbox("Sale Price column", cols, key="rb_hcspc")
+                    price_col = st.selectbox("Sale Price column", hcols, key="rb_hcspc")
                 with hc2:
-                    age_col = st.selectbox("Year Built column", cols, key="rb_hcagc")
+                    age_col = st.selectbox("Year Built column", hcols, key="rb_hcagc")
                 with hc3:
                     if st.button("Extract Trends"):
                         if price_col != "(select)":
-                            prices = pd.to_numeric(df[price_col].str.replace(
-                                r'[$,]','',regex=True), errors='coerce').dropna()
-                            st.session_state.rb_price_low = f"${prices.min():,.0f}"
-                            st.session_state.rb_price_high = f"${prices.max():,.0f}"
-                            st.session_state.rb_price_pred = f"${prices.median():,.0f}"
+                            # Handle both numeric and text price columns
+                            raw = df_h[price_col]
+                            if raw.dtype == object:
+                                prices = pd.to_numeric(
+                                    raw.astype(str).str.replace(r'[$,]','',regex=True),
+                                    errors='coerce').dropna()
+                            else:
+                                prices = pd.to_numeric(raw, errors='coerce').dropna()
+                            if len(prices):
+                                st.session_state.rb_price_low  = f"${prices.min():,.0f}"
+                                st.session_state.rb_price_high = f"${prices.max():,.0f}"
+                                st.session_state.rb_price_pred = f"${prices.median():,.0f}"
                         if age_col != "(select)":
-                            ages = pd.to_numeric(df[age_col], errors='coerce').dropna()
-                            yr = date.today().year
-                            st.session_state.rb_age_low = str(int(yr - ages.max()))
-                            st.session_state.rb_age_high = str(int(yr - ages.min()))
-                            st.session_state.rb_age_pred = str(int(yr - ages.median()))
+                            raw_a = df_h[age_col]
+                            ages = pd.to_numeric(raw_a, errors='coerce').dropna()
+                            if len(ages):
+                                yr = date.today().year
+                                st.session_state.rb_age_low  = str(int(yr - ages.max()))
+                                st.session_state.rb_age_high = str(int(yr - ages.min()))
+                                st.session_state.rb_age_pred = str(int(yr - ages.median()))
                         st.rerun()
             except Exception as e:
                 st.error(f"CSV error: {e}")
@@ -1886,73 +2673,123 @@ with tab_report:
             st.session_state.rb_age_pred = st.text_input(
                 "Age Predominant (yrs)", st.session_state.rb_age_pred, placeholder="55")
 
-    # ── SECTION 5: COMPARABLE SALES ───────────────────────────────────────
-    elif active.startswith("5"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 5 — COMPARABLE SALES
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 4:
         st.markdown("### Comparable Sales Data")
-        st.info("Upload your MLS comp CSV exported from Spark/MLS — same file you already pull. Fields will auto-populate.")
+        st.info("Upload your MLS comp CSV from Spark/MLS — same file you already pull.")
 
-        comp_csv = st.file_uploader(
-            "Upload Comp CSV", type=["csv"], key="rb_comp_csv")
-
+        comp_csv = st.file_uploader("Upload Comp CSV", type=["csv"], key="rb_comp_csv")
         if comp_csv:
             try:
-                df = pd.read_csv(comp_csv)
-                st.success(f"Loaded {len(df)} rows, {len(df.columns)} columns")
-                st.dataframe(df, use_container_width=True)
-                st.session_state["rb_comp_df"] = df.to_json()
+                df_c = pd.read_csv(comp_csv)
+                st.success(f"Loaded {len(df_c)} rows")
+                st.session_state["rb_comp_df"] = df_c.to_json()
+                st.session_state["rb_comp_columns"] = list(df_c.columns)
             except Exception as e:
                 st.error(f"CSV error: {e}")
-        elif st.session_state.get("rb_comp_df"):
-            df = pd.read_json(st.session_state["rb_comp_df"])
-            st.dataframe(df, use_container_width=True)
-            st.caption("Previously loaded comp data shown above.")
+
+        if st.session_state.get("rb_comp_df"):
+            df_c = pd.read_json(st.session_state["rb_comp_df"])
+            cols = st.session_state.get("rb_comp_columns", list(df_c.columns))
+
+            st.dataframe(df_c, use_container_width=True)
+
+            # Column mapping dropdowns
+            st.markdown("**Map CSV columns to comp fields:**")
+            cc1, cc2, cc3, cc4 = st.columns(4)
+            col_opts = ["(skip)"] + cols
+            with cc1:
+                st.session_state["rb_col_address"] = st.selectbox(
+                    "Address column", col_opts,
+                    index=col_opts.index(st.session_state.get("rb_col_address","(skip)"))
+                          if st.session_state.get("rb_col_address") in col_opts else 0,
+                    key="col_map_addr")
+            with cc2:
+                st.session_state["rb_col_price"] = st.selectbox(
+                    "Sale Price column", col_opts,
+                    index=col_opts.index(st.session_state.get("rb_col_price","(skip)"))
+                          if st.session_state.get("rb_col_price") in col_opts else 0,
+                    key="col_map_price")
+            with cc3:
+                st.session_state["rb_col_gla"] = st.selectbox(
+                    "GLA column", col_opts,
+                    index=col_opts.index(st.session_state.get("rb_col_gla","(skip)"))
+                          if st.session_state.get("rb_col_gla") in col_opts else 0,
+                    key="col_map_gla")
+            with cc4:
+                st.session_state["rb_col_date"] = st.selectbox(
+                    "Sale Date column", col_opts,
+                    index=col_opts.index(st.session_state.get("rb_col_date","(skip)"))
+                          if st.session_state.get("rb_col_date") in col_opts else 0,
+                    key="col_map_date")
+
+            # Auto-populate comp addresses from CSV
+            addr_col = st.session_state.get("rb_col_address","(skip)")
+            if addr_col != "(skip)" and addr_col in df_c.columns:
+                csv_addresses = df_c[addr_col].astype(str).tolist()
+                for i, addr in enumerate(csv_addresses[:10]):
+                    key = f"rb_comp_addr_{i}"
+                    if key not in st.session_state or not st.session_state[key]:
+                        st.session_state[key] = addr
 
         st.divider()
-        st.markdown("**Comp Photo Uploads** (up to 5 comps)")
-        for i in range(5):
-            with st.expander(f"Comparable #{i+1} Photo"):
+        st.markdown("**Number of Comps**")
+        st.session_state.rb_num_comps = st.number_input(
+            "How many comps?", min_value=1, max_value=10,
+            value=int(st.session_state.rb_num_comps), step=1,
+            key="num_comps_input")
+
+        st.divider()
+        st.markdown("**Comp Photo Uploads**")
+        for i in range(int(st.session_state.rb_num_comps)):
+            with st.expander(f"Comparable #{i+1}"):  # starts at 1
                 addr_key = f"rb_comp_addr_{i}"
-                photo_key = f"rb_comp_photo_{i}"
                 if addr_key not in st.session_state:
                     st.session_state[addr_key] = ""
                 st.session_state[addr_key] = st.text_input(
-                    f"Comp #{i+1} Address", st.session_state[addr_key],
-                    key=f"comp_addr_input_{i}")
-                uploaded = st.file_uploader(
+                    f"Comp #{i+1} Address",
+                    st.session_state[addr_key],
+                    key=f"comp_addr_inp_{i}")
+                f = st.file_uploader(
                     f"Comp #{i+1} Exterior Photo",
-                    type=["jpg","jpeg","png"], key=f"comp_photo_up_{i}")
-                if uploaded:
-                    st.image(uploaded, use_container_width=True)
-                    st.session_state[photo_key] = uploaded
+                    type=["jpg","jpeg","png"],
+                    key=f"comp_photo_up_{i}")
+                if f:
+                    save_photo(f"comp_{i}", f)
+                show_saved_photo(f"comp_{i}", f"Comp #{i+1}")
 
-    # ── SECTION 6: MAPS ───────────────────────────────────────────────────
-    elif active.startswith("6"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 6 — MAPS
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 5:
         st.markdown("### Maps")
-
         mc1, mc2 = st.columns(2)
         with mc1:
             st.markdown("**Plat Map**")
-            plat = st.file_uploader("Upload Plat Map image",
-                                     type=["jpg","jpeg","png"], key="rb_plat_map")
-            if plat:
-                st.image(plat, use_container_width=True)
-                st.session_state["rb_plat_map_file"] = plat
+            f = st.file_uploader("Upload Plat Map", type=["jpg","jpeg","png"],
+                                  key="rb_plat_up")
+            if f:
+                save_photo("plat_map", f)
+            show_saved_photo("plat_map", "Plat Map")
         with mc2:
             st.markdown("**Comparable Sales Map**")
-            comp_map = st.file_uploader("Upload Comp Map image",
-                                         type=["jpg","jpeg","png"], key="rb_comp_map")
-            if comp_map:
-                st.image(comp_map, use_container_width=True)
-                st.session_state["rb_comp_map_file"] = comp_map
+            f = st.file_uploader("Upload Comp Map", type=["jpg","jpeg","png"],
+                                  key="rb_comp_map_up")
+            if f:
+                save_photo("comp_map", f)
+            show_saved_photo("comp_map", "Comp Map")
 
-    # ── SECTION 7: RECONCILIATION & VALUE ─────────────────────────────────
-    elif active.startswith("7"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 7 — RECONCILIATION & VALUE
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 6:
         st.markdown("### Final Value Conclusion & Reconciliation")
 
-        comments = load_data("comments_data", "rc_comments.json", DEFAULT_COMMENTS)
-        recon_comments = [c for c in comments if "reconcil" in c["category"].lower()
-                          or "approach" in c["category"].lower()
-                          or "income" in c["category"].lower()]
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
+        recon_comments = [c for c in comments if any(x in c["category"].lower()
+                           for x in ["reconcil","approach","income"])]
         lib_pull("Reconciliation Comments", recon_comments, "reconciliation")
 
         st.session_state.rb_reconciliation = st.text_area(
@@ -1973,34 +2810,35 @@ with tab_report:
                 value=date.fromisoformat(st.session_state.rb_effective_date)
             ).isoformat()
 
-    # ── SECTION 8: SKETCH ─────────────────────────────────────────────────
-    elif active.startswith("8"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 8 — SKETCH
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 7:
         st.markdown("### Floor Plan / Sketch")
-        st.caption("Upload CubiCasa sketch export or TOTAL sketch PDF export as image.")
-
+        st.caption("Upload CubiCasa or TOTAL sketch export as image.")
         sk1, sk2 = st.columns(2)
         with sk1:
             st.markdown("**Above Grade Floor Plan**")
-            sketch_ag = st.file_uploader("Above Grade Sketch",
-                                          type=["jpg","jpeg","png","pdf"],
-                                          key="rb_sketch_ag")
-            if sketch_ag and sketch_ag.type != "application/pdf":
-                st.image(sketch_ag, use_container_width=True)
-                st.session_state["rb_sketch_ag_file"] = sketch_ag
+            f = st.file_uploader("Above Grade Sketch",
+                                  type=["jpg","jpeg","png"], key="rb_sketch_ag_up")
+            if f:
+                save_photo("sketch_ag", f)
+            show_saved_photo("sketch_ag", "Above Grade")
         with sk2:
-            st.markdown("**Below Grade / Basement Floor Plan**")
-            sketch_bg = st.file_uploader("Basement Sketch",
-                                          type=["jpg","jpeg","png","pdf"],
-                                          key="rb_sketch_bg")
-            if sketch_bg and sketch_bg.type != "application/pdf":
-                st.image(sketch_bg, use_container_width=True)
-                st.session_state["rb_sketch_bg_file"] = sketch_bg
+            st.markdown("**Basement Floor Plan**")
+            f = st.file_uploader("Basement Sketch",
+                                  type=["jpg","jpeg","png"], key="rb_sketch_bg_up")
+            if f:
+                save_photo("sketch_bg", f)
+            show_saved_photo("sketch_bg", "Basement")
 
-    # ── SECTION 9: SCOPE OF WORK ──────────────────────────────────────────
-    elif active.startswith("9"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 9 — SCOPE OF WORK
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 8:
         st.markdown("### Scope of Work")
 
-        comments = load_data("comments_data", "rc_comments.json", DEFAULT_COMMENTS)
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
         sow_comments = [c for c in comments if "scope" in c["category"].lower()]
         lib_pull("Scope of Work Language", sow_comments, "scope_of_work")
 
@@ -2009,38 +2847,37 @@ with tab_report:
             st.session_state.rb_scope_of_work,
             height=220)
 
-    # ── SECTION 10: LIMITING CONDITIONS ───────────────────────────────────
-    elif active.startswith("10"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 10 — LIMITING CONDITIONS
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 9:
         st.markdown("### Limiting Conditions")
 
-        comments = load_data("comments_data", "rc_comments.json", DEFAULT_COMMENTS)
-        lc_comments = [c for c in comments if "condition" in c["category"].lower()
-                        or "inspection" in c["category"].lower()
-                        or "environmental" in c["category"].lower()]
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
+        lc_comments = [c for c in comments if any(x in c["category"].lower()
+                        for x in ["condition","inspection","environmental"])]
         lib_pull("Limiting Condition Language", lc_comments, "limiting_conditions")
 
         st.session_state.rb_limiting_conditions = st.text_area(
             "Limiting Conditions",
             st.session_state.rb_limiting_conditions,
-            height=300)
+            height=320)
 
-    # ── SECTION 11: CERTIFICATION ─────────────────────────────────────────
-    elif active.startswith("11"):
+    # ══════════════════════════════════════════════════════════════════════
+    # SECTION 11 — CERTIFICATION & SIGNATURE
+    # ══════════════════════════════════════════════════════════════════════
+    elif active_idx == 10:
         st.markdown("### Appraiser Certification & Signature")
 
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Inspection Details**")
+            insp_opts = ["Interior & Exterior","Exterior Only",
+                         "Desktop (No Inspection)","Drive-By","Hybrid"]
             st.session_state.rb_inspection_type = st.selectbox(
-                "Inspection Type",
-                ["Interior & Exterior","Exterior Only","Desktop (No Inspection)",
-                 "Drive-By","Hybrid"],
-                index=["Interior & Exterior","Exterior Only",
-                       "Desktop (No Inspection)","Drive-By","Hybrid"].index(
-                    st.session_state.rb_inspection_type)
-                    if st.session_state.rb_inspection_type in
-                    ["Interior & Exterior","Exterior Only",
-                     "Desktop (No Inspection)","Drive-By","Hybrid"] else 0)
+                "Inspection Type", insp_opts,
+                index=insp_opts.index(st.session_state.rb_inspection_type)
+                      if st.session_state.rb_inspection_type in insp_opts else 0)
             st.session_state.rb_inspection_date = st.date_input(
                 "Date of Inspection",
                 value=date.fromisoformat(st.session_state.rb_inspection_date)
@@ -2050,22 +2887,28 @@ with tab_report:
                 value=date.fromisoformat(st.session_state.rb_report_date)
             ).isoformat()
 
+            st.divider()
+            st.markdown("**Appraiser Info**")
+            st.info("Spencer Webb  |  A-Tech Appraisal Co., LLC  |  "
+                    "CRA.0060031  |  RI  |  Expires: 05/03/2026")
+
         with col2:
             st.markdown("**License / Certification Image**")
-            lic_upload = st.file_uploader(
-                "Upload License Certificate Image",
-                type=["jpg","jpeg","png"], key="rb_license_img")
-            if lic_upload:
-                st.image(lic_upload, use_container_width=True)
-                st.session_state["rb_license_file"] = lic_upload
+            f = st.file_uploader("Upload License Certificate Image",
+                                  type=["jpg","jpeg","png"], key="rb_license_up")
+            if f:
+                save_photo("license", f)
+            b = get_photo_bytes("license")
+            if b:
+                st.image(b, caption="Appraiser License", use_container_width=True)
+            else:
+                st.caption("No license image uploaded yet.")
 
-        st.divider()
-        st.info("**Appraiser:** Spencer Webb  |  **Company:** A-Tech Appraisal Co., LLC  |  **License:** CRA.0060031 — RI  |  **Expires:** 05/03/2026")
-
-    # ── GENERATE PDF ──────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════
+    # GENERATE PDF — always visible at bottom
+    # ══════════════════════════════════════════════════════════════════════
     st.divider()
     st.markdown("### Generate Report")
-
     col_gen, col_reset = st.columns([3,1])
     with col_reset:
         if st.button("🗑 Reset All Fields"):
@@ -2079,7 +2922,8 @@ with tab_report:
             with st.spinner("Building report..."):
                 try:
                     pdf_bytes = generate_gp_res_pdf(st.session_state)
-                    addr_slug = st.session_state.get("rb_address1","report").replace(" ","_").replace(",","")
+                    addr_slug = st.session_state.get(
+                        "rb_address1","report").replace(" ","_").replace(",","")
                     st.download_button(
                         "⬇️ Download PDF",
                         data=pdf_bytes,
