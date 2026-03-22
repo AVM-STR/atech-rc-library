@@ -258,13 +258,17 @@ def generate_gp_res_pdf(ss):
                 c.drawCentredString(self.width/2, self.height/2-5, self.lbl)
 
         if file_obj is None:
-            return PhotoBox(w, h, label)
+            return None
+        if isinstance(file_obj, bytes) and len(file_obj) < 100:
+            return None  # empty or corrupt bytes
         try:
             if isinstance(file_obj, bytes):
                 img_data = file_obj
             else:
                 file_obj.seek(0)
                 img_data = file_obj.read()
+            if len(img_data) < 100:
+                return None
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
             tmp.write(img_data)
             tmp.close()
@@ -757,21 +761,26 @@ def generate_gp_res_pdf(ss):
     story.append(banner("SUBJECT PROPERTY PHOTOS"))
     story.append(Spacer(1, 0.12*inch))
 
-    # Exterior 3-up with labels
+    # Exterior photos — only render slots that have actual photos
     ext_labels = ["Subject Front", "Subject Rear", "Subject Street"]
     ext_keys   = ["rb_photo_bytes_front", "rb_photo_bytes_rear", "rb_photo_bytes_street"]
-    ext_cells  = []
-    for lbl, key in zip(ext_labels, ext_keys):
-        cell = Table([
-            [img_cell(ss.get(key), 2.25*inch, 1.8*inch, f"[ {lbl.upper()} ]")],
-            [Paragraph(lbl, S(f"ext_{key}", fontName="Helvetica-Bold", fontSize=8,
-                               textColor=DARK_GRAY, alignment=TA_CENTER))],
-        ], colWidths=[2.35*inch])
-        ext_cells.append(cell)
-    ext_row = Table([ext_cells], colWidths=[2.4*inch]*3)
-    ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-    story.append(ext_row)
-    story.append(Spacer(1, 0.12*inch))
+    ext_items  = [(lbl, key) for lbl, key in zip(ext_labels, ext_keys)
+                   if isinstance(ss.get(key), bytes) and len(ss.get(key, b"")) > 100]
+    if ext_items:
+        n_ext = len(ext_items)
+        ext_w = 7.2*inch / n_ext
+        ext_cells = []
+        for lbl, key in ext_items:
+            cell = Table([
+                [img_cell(ss.get(key), ext_w - 0.15*inch, 1.8*inch, f"[ {lbl.upper()} ]")],
+                [Paragraph(lbl, S(f"ext_{key}", fontName="Helvetica-Bold", fontSize=8,
+                                   textColor=DARK_GRAY, alignment=TA_CENTER))],
+            ], colWidths=[ext_w - 0.1*inch])
+            ext_cells.append(cell)
+        ext_row = Table([ext_cells], colWidths=[ext_w]*n_ext)
+        ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
+        story.append(ext_row)
+        story.append(Spacer(1, 0.12*inch))
 
     # Room/bath/basement photos — dynamic
     try:
@@ -786,20 +795,37 @@ def generate_gp_res_pdf(ss):
                             "Bedroom 2","Bedroom 3","Bedroom 4","Den","Office",
                             "Family Room","Sunroom","Other Room"]
 
+    def has_photo(key):
+        """Check if a real photo exists for this key."""
+        v = ss.get(key)
+        return isinstance(v, bytes) and len(v) > 100
+
     def photo_batch_row(items):
-        while len(items) < 3:
-            items.append({"label":"","key":None})
+        """Render only items that have real photos — no blank placeholders."""
+        real_items = [it for it in items
+                      if it.get("key") and has_photo(it["key"])]
+        if not real_items:
+            return None
+        n = len(real_items)
+        cell_w = 7.2*inch / n
         row_cells = []
-        for it in items:
-            photo = ss.get(it["key"]) if it["key"] else None
+        for it in real_items:
+            photo = ss.get(it["key"])
             lbl   = it["label"] or ""
+            img   = img_cell(photo, cell_w - 0.15*inch, 1.75*inch, "")
+            if img is None:
+                continue
             cell  = Table([
-                [img_cell(photo, 2.25*inch, 1.75*inch, f"[ {lbl.upper()} ]")],
+                [img],
                 [Paragraph(lbl, S(f"rlbl_{lbl[:8]}", fontName="Helvetica",
                             fontSize=7.5, textColor=MID_GRAY, alignment=TA_CENTER))],
-            ], colWidths=[2.35*inch])
+            ], colWidths=[cell_w - 0.1*inch])
             row_cells.append(cell)
-        r = Table([row_cells], colWidths=[2.4*inch]*3)
+        if not row_cells:
+            return None
+        actual_n = len(row_cells)
+        actual_w = 7.2*inch / actual_n
+        r = Table([row_cells], colWidths=[actual_w]*actual_n)
         r.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
                                 ("RIGHTPADDING",(0,0),(-1,-1),3)]))
         return r
@@ -811,8 +837,10 @@ def generate_gp_res_pdf(ss):
                    room_labels_default[i] if i < len(room_labels_default) else f"Room {i+1}"),
                   "key": f"rb_photo_bytes_room_{i}"} for i in range(n_rooms)]
         for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.1*inch))
+            row = photo_batch_row(items[i:i+3])
+            if row:
+                story.append(row)
+                story.append(Spacer(1, 0.1*inch))
 
     total_baths = n_full + n_half
     if total_baths > 0:
@@ -821,8 +849,10 @@ def generate_gp_res_pdf(ss):
         items = [{"label": f"Full Bath {i+1}" if i < n_full else f"Half Bath {i-n_full+1}",
                   "key": f"rb_photo_bytes_bath_{i}"} for i in range(total_baths)]
         for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.1*inch))
+            row = photo_batch_row(items[i:i+3])
+            if row:
+                story.append(row)
+                story.append(Spacer(1, 0.1*inch))
 
     if n_bsmt > 0:
         story.append(sub_banner("BASEMENT"))
@@ -830,8 +860,10 @@ def generate_gp_res_pdf(ss):
         items = [{"label": ss.get(f"rb_bsmt_label_{i}", f"Basement Room {i+1}"),
                   "key": f"rb_photo_bytes_bsmt_{i}"} for i in range(n_bsmt)]
         for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.1*inch))
+            row = photo_batch_row(items[i:i+3])
+            if row:
+                story.append(row)
+                story.append(Spacer(1, 0.1*inch))
 
     # ══ PHOTO APPENDIX — COMPARABLE SALE PHOTOS ══════════════════════════
     num_comps = int(ss.get("rb_num_comps", 3))
@@ -841,23 +873,26 @@ def generate_gp_res_pdf(ss):
         addr = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
         comp_batch.append({"file": f, "label": addr})
 
-    if any(b["file"] for b in comp_batch):
+    if any(isinstance(b["file"], bytes) and len(b["file"]) > 100 for b in comp_batch):
         story.append(PageBreak())
         story.append(banner("COMPARABLE SALE PHOTOS"))
         story.append(Spacer(1, 0.12*inch))
         for i in range(0, len(comp_batch), 3):
-            batch = comp_batch[i:i+3]
-            while len(batch) < 3:
-                batch.append({"file": None, "label": ""})
+            batch = [b for b in comp_batch[i:i+3]
+                     if isinstance(b["file"], bytes) and len(b["file"]) > 100]
+            if not batch:
+                continue
+            n = len(batch)
+            cell_w = 7.2*inch / n
             row = Table([[
-                Table([[img_cell(b["file"], 2.25*inch, 1.75*inch,
-                                  f"[ COMP #{i+j+1} ]")],
+                Table([[img_cell(b["file"], cell_w - 0.15*inch, 1.75*inch,
+                                  f"[ COMP #{comp_batch.index(b)+1} ]")],
                        [Paragraph(b["label"][:40],
                                    S(f"cl_{i+j}", fontName="Helvetica", fontSize=7,
                                      textColor=MID_GRAY, alignment=TA_CENTER))]],
-                      colWidths=[2.35*inch])
+                      colWidths=[cell_w - 0.1*inch])
                 for j, b in enumerate(batch)
-            ]], colWidths=[2.4*inch]*3)
+            ]], colWidths=[cell_w]*n)
             row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
                                       ("RIGHTPADDING",(0,0),(-1,-1),3)]))
             story.append(row)
