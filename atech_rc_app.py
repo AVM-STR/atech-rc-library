@@ -429,6 +429,11 @@ def generate_gp_res_pdf(ss):
     story.append(banner("IMPROVEMENTS DESCRIPTION"))
     story.append(Spacer(1, 0.12*inch))
 
+    impr_narrative = ss.get("rb_improvements_narrative","")
+    if impr_narrative:
+        story.append(Paragraph(impr_narrative, body))
+        story.append(Spacer(1, 0.1*inch))
+
     amenities_list = list(ss.get("rb_amenities") or [])
     fc = str(ss.get("rb_fireplace_count","0"))
     wc = str(ss.get("rb_woodstove_count","0"))
