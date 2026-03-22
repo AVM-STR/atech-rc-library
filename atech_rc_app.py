@@ -351,6 +351,7 @@ def generate_gp_res_pdf(ss):
         [Paragraph("<b>Tax Year / Amount:</b>", lk),
          Paragraph(f"{ss.get('rb_tax_year','—')}  |  ${ss.get('rb_tax_amount','—')}", lv2)],
         [Paragraph("<b>Effective Date:</b>", lk), Paragraph(eff_dt, lv2)],
+        [Paragraph("<b>Owner:</b>", lk), Paragraph(ss.get("rb_owner","—"), lv2)],
         [Paragraph("<b>Prepared By:</b>", lk),
          Paragraph("Spencer Webb, CRA  |  A-Tech Appraisal Co., LLC", lv2)],
     ]
@@ -389,7 +390,7 @@ def generate_gp_res_pdf(ss):
          Paragraph("Owner", ml),
          Paragraph("Condition", ml)],
         [Paragraph(value_str or "—", mv),
-         Paragraph(ss.get("rb_intended_user","—"), mv),
+         Paragraph(ss.get("rb_owner","—"), mv),
          Paragraph(cond.split(" — ")[0] if "—" in cond else cond, mv)],
         [Paragraph("Intended Use", ml),
          Paragraph("Effective Date", ml),
@@ -1522,6 +1523,7 @@ with tab_report:
     rb_init("opinion_value", "")
     rb_init("intended_use", "Market Value as of the Effective Date")
     rb_init("intended_user", "")
+    rb_init("owner", "")
     rb_init("property_type", "Single Family")
     rb_init("property_rights", "Fee Simple")
     rb_init("tax_year", str(date.today().year))
@@ -1705,6 +1707,8 @@ with tab_report:
                 "Intended Use", st.session_state.rb_intended_use)
             st.session_state.rb_intended_user = st.text_input(
                 "Intended User", st.session_state.rb_intended_user)
+            st.session_state.rb_owner = st.text_input(
+                "Owner of Record", st.session_state.rb_owner)
             st.session_state.rb_property_type = st.selectbox(
                 "Property Type",
                 ["Single Family","Condominium","2-4 Unit","Vacant Land"],
