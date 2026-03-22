@@ -460,7 +460,8 @@ def generate_gp_res_pdf(ss):
          ("BASEMENT", bsmt_str),
          ("AMENITIES", amenities_str)],
         [("YEAR BUILT", ss.get("rb_year_built","—")),
-         ("HEATING FUEL", ss.get("rb_heating_fuel","—")),
+         ("HEATING", f"{ss.get('rb_heating_type','—')} / {ss.get('rb_heating_fuel','—')}"),
+         ("COOLING", ss.get("rb_cooling_type","—")),
          ("WATER / SEWER", f"{ss.get('rb_water_type','—')} / {ss.get('rb_sewer_type','—')}"),
          ("ELECTRICITY", elec_str),
          ("PARKING", ss.get("rb_parking","—")),
@@ -1586,6 +1587,8 @@ with tab_report:
     rb_init("improvements_narrative", "")
     rb_init("electricity", True)
     rb_init("heating_fuel", "Gas")
+    rb_init("heating_type", "Forced Hot Water")
+    rb_init("cooling_type", "Central AC")
     rb_init("water_type", "Public")
     rb_init("sewer_type", "Sewer")
     rb_init("hbu_comment", "The highest and best use is a single family dwelling.")
@@ -1834,6 +1837,17 @@ with tab_report:
                     st.session_state.rb_heating_fuel)
                     if st.session_state.rb_heating_fuel in
                     ["Gas","Oil","Electric","Propane","Solar","Other"] else 0)
+            ht_opts = ["Forced Hot Water","Forced Hot Air","Radiant","Baseboard Electric",
+                       "Heat Pump","Mini Split","Steam","Other"]
+            st.session_state.rb_heating_type = st.selectbox(
+                "Heating Type", ht_opts,
+                index=ht_opts.index(st.session_state.rb_heating_type)
+                      if st.session_state.rb_heating_type in ht_opts else 0)
+            ct_opts = ["Central AC","Mini Split","Window Unit","None","Other"]
+            st.session_state.rb_cooling_type = st.selectbox(
+                "Cooling Type", ct_opts,
+                index=ct_opts.index(st.session_state.rb_cooling_type)
+                      if st.session_state.rb_cooling_type in ct_opts else 0)
         with uc2:
             st.session_state.rb_water_type = st.selectbox(
                 "Water", ["Public","Well","Other"],
