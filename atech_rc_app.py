@@ -523,42 +523,100 @@ def generate_gp_res_pdf(ss):
         ))
     story.append(PageBreak())
 
-    # ══ PAGE 4: COMPS ══════════════════════════════════════════════════════
+    # ══ PAGE 4: COMPARABLE SALES ANALYSIS ════════════════════════════════
     story.append(banner("COMPARABLE SALES ANALYSIS"))
     story.append(Spacer(1, 0.12*inch))
 
-    comp_df_json = ss.get("rb_comp_df")
-    if comp_df_json:
-        try:
-            import pandas as pd
-            df = pd.read_json(comp_df_json)
-            # Build a clean table from the CSV
-            cols = list(df.columns)
-            header = [Paragraph(str(c)[:20], S("ch2", fontName="Helvetica-Bold",
-                        fontSize=7, textColor=WHITE, alignment=TA_CENTER))
-                      for c in cols[:8]]
-            rows = [header]
-            for _, row in df.head(6).iterrows():
-                rows.append([Paragraph(str(row[c])[:25],
-                              S("cd2", fontName="Helvetica", fontSize=7.5,
-                                textColor=DARK_GRAY))
-                             for c in cols[:8]])
-            cw_comp = 7.2*inch / min(8, len(cols))
-            ct = Table(rows, colWidths=[cw_comp]*min(8,len(cols)), repeatRows=1)
-            ct.setStyle(TableStyle([
-                ("BACKGROUND",(0,0),(-1,0),BLACK),
-                ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE, VERY_LIGHT]),
-                ("BOX",(0,0),(-1,-1),0.5,LIGHT_GRAY),
-                ("INNERGRID",(0,0),(-1,-1),0.3,LIGHT_GRAY),
-                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
-                ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
-                ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ]))
-            story.append(ct)
-        except Exception as e:
-            story.append(Paragraph(f"Comp data error: {e}", body))
-    else:
-        story.append(Paragraph("No comparable sales CSV uploaded.", body))
+    # ── Adjustment Methodology ────────────────────────────────────────────
+    adj_meth = ss.get("rb_adj_methodology","")
+    if adj_meth:
+        story.append(sub_banner("ADJUSTMENT METHODOLOGY"))
+        story.append(Spacer(1, 0.08*inch))
+        story.append(Paragraph(adj_meth, body))
+        story.append(Spacer(1, 0.12*inch))
+
+    # ── Individual comp narratives ────────────────────────────────────────
+    num_comps = int(ss.get("rb_num_comps", 3))
+    for i in range(num_comps):
+        addr    = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
+        price   = ss.get(f"rb_comp_price_{i}", "")
+        date    = ss.get(f"rb_comp_date_{i}", "")
+        gla     = ss.get(f"rb_comp_gla_{i}", "")
+        beds    = ss.get(f"rb_comp_beds_{i}", "")
+        baths   = ss.get(f"rb_comp_baths_{i}", "")
+        adj     = ss.get(f"rb_comp_adj_{i}", "")
+        adjval  = ss.get(f"rb_comp_adjval_{i}", "")
+        desc    = ss.get(f"rb_comp_desc_{i}", "")
+
+        # Comp header bar
+        comp_hdr = Table([[
+            Paragraph(f"COMPARABLE SALE #{i+1}",
+                      S(f"ch_{i}", fontName="Helvetica-Bold", fontSize=10, textColor=WHITE)),
+            Paragraph(f"${price}" if price and not price.startswith("$") else price,
+                      S(f"cp_{i}", fontName="Helvetica-Bold", fontSize=10,
+                        textColor=WHITE, alignment=TA_RIGHT)),
+        ]], colWidths=[5.5*inch, 1.7*inch])
+        comp_hdr.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1), DARK_GRAY),
+            ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("LEFTPADDING",(0,0),(-1,-1),10),("RIGHTPADDING",(0,0),(-1,-1),10),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ]))
+        story.append(comp_hdr)
+
+        # Key stats row
+        stats_data = [
+            [Paragraph("ADDRESS", S(f"csl_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY)),
+             Paragraph("SALE DATE", S(f"csd_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY)),
+             Paragraph("GLA", S(f"csg_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY)),
+             Paragraph("BEDS / BATHS", S(f"csb_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY)),
+             Paragraph("NET ADJ", S(f"csn_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY)),
+             Paragraph("ADJUSTED VALUE", S(f"csv_{i}", fontName="Helvetica-Bold", fontSize=7.5,
+                        textColor=MID_GRAY))],
+            [Paragraph(addr, S(f"csv2_{i}", fontName="Helvetica", fontSize=9,
+                        textColor=DARK_GRAY)),
+             Paragraph(date, S(f"csd2_{i}", fontName="Helvetica", fontSize=9,
+                        textColor=DARK_GRAY)),
+             Paragraph(f"{gla} sf" if gla else "—", S(f"csg2_{i}", fontName="Helvetica",
+                        fontSize=9, textColor=DARK_GRAY)),
+             Paragraph(f"{beds} / {baths}" if beds or baths else "—",
+                        S(f"csb2_{i}", fontName="Helvetica", fontSize=9, textColor=DARK_GRAY)),
+             Paragraph(adj or "—", S(f"csn2_{i}", fontName="Helvetica-Bold", fontSize=9,
+                        textColor=DARK_GRAY)),
+             Paragraph(f"${adjval}" if adjval and not adjval.startswith("$") else (adjval or "—"),
+                        S(f"csva_{i}", fontName="Helvetica-Bold", fontSize=9,
+                          textColor=BLACK))],
+        ]
+        stats_t = Table(stats_data, colWidths=[2.0*inch, 0.9*inch, 0.7*inch,
+                                                0.85*inch, 0.85*inch, 1.2*inch])
+        stats_t.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0), VERY_LIGHT),
+            ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+            ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("LINEBELOW",(0,0),(-1,0),0.5, LIGHT_GRAY),
+            ("LINEBELOW",(0,1),(-1,1),0.5, LIGHT_GRAY),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ]))
+        story.append(stats_t)
+
+        # Narrative
+        if desc:
+            story.append(Paragraph(desc, S(f"cdesc_{i}", fontName="Helvetica", fontSize=9.5,
+                           textColor=DARK_GRAY, leading=15, spaceAfter=0,
+                           leftIndent=6, rightIndent=6)))
+        story.append(Spacer(1, 0.15*inch))
+
+    # ── Sales Comparison Reconciliation ──────────────────────────────────
+    comp_recon = ss.get("rb_comp_reconciliation","")
+    if comp_recon:
+        story.append(sub_banner("SALES COMPARISON RECONCILIATION"))
+        story.append(Spacer(1, 0.08*inch))
+        story.append(Paragraph(comp_recon, body))
 
     story.append(PageBreak())
 
@@ -566,21 +624,13 @@ def generate_gp_res_pdf(ss):
     story.append(banner("MAPS"))
     story.append(Spacer(1, 0.12*inch))
 
-    maps_row = Table([[
-        Table([[Paragraph("Plat Map", S("maplbl", fontName="Helvetica-Bold", fontSize=8,
-                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_photo_bytes_plat_map") or ss.get("rb_plat_map_file"), 3.4*inch, 2.5*inch, "[ PLAT MAP ]")]],
-              colWidths=[3.5*inch]),
-        Table([[Paragraph("Comparable Sales Map", S("maplbl2", fontName="Helvetica-Bold",
-                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_photo_bytes_comp_map") or ss.get("rb_comp_map_file"), 3.4*inch, 2.5*inch, "[ COMP MAP ]")]],
-              colWidths=[3.5*inch]),
-    ]], colWidths=[3.6*inch, 3.6*inch])
-    maps_row.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
-    ]))
-    story.append(maps_row)
+    story.append(Paragraph("Plat Map", S("maplbl", fontName="Helvetica-Bold", fontSize=9,
+                   textColor=MID_GRAY, spaceAfter=5)))
+    story.append(img_cell(ss.get("rb_photo_bytes_plat_map"), 7.2*inch, 3.8*inch, "[ PLAT MAP ]"))
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("Comparable Sales Map", S("maplbl2", fontName="Helvetica-Bold",
+                   fontSize=9, textColor=MID_GRAY, spaceAfter=5)))
+    story.append(img_cell(ss.get("rb_photo_bytes_comp_map"), 7.2*inch, 3.8*inch, "[ COMPARABLE SALES MAP ]"))
     story.append(PageBreak())
 
     # ══ PAGE 6: RECONCILIATION & VALUE ════════════════════════════════════
@@ -613,28 +663,7 @@ def generate_gp_res_pdf(ss):
     story.append(fv_t)
     story.append(PageBreak())
 
-    # ══ PAGE 7: SKETCH ════════════════════════════════════════════════════
-    story.append(banner("FLOOR PLAN / SKETCH"))
-    story.append(Spacer(1, 0.12*inch))
-
-    sketch_row = Table([[
-        Table([[Paragraph("Above Grade", S("sktl", fontName="Helvetica-Bold", fontSize=8,
-                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_photo_bytes_sketch_ag") or ss.get("rb_sketch_ag_file"), 3.4*inch, 3.0*inch, "[ ABOVE GRADE FLOOR PLAN ]")]],
-              colWidths=[3.5*inch]),
-        Table([[Paragraph("Basement / Below Grade", S("sktl2", fontName="Helvetica-Bold",
-                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_photo_bytes_sketch_bg") or ss.get("rb_sketch_bg_file"), 3.4*inch, 3.0*inch, "[ BASEMENT FLOOR PLAN ]")]],
-              colWidths=[3.5*inch]),
-    ]], colWidths=[3.6*inch, 3.6*inch])
-    sketch_row.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
-    ]))
-    story.append(sketch_row)
-    story.append(PageBreak())
-
-    # ══ PAGE 8: SCOPE & LIMITING CONDITIONS ═══════════════════════════════
+    # ══ PAGE 7: SCOPE & LIMITING CONDITIONS ═══════════════════════════════
     story.append(banner("SCOPE OF WORK"))
     story.append(Spacer(1, 0.1*inch))
     sow = ss.get("rb_scope_of_work","")
@@ -1549,6 +1578,7 @@ with tab_report:
     rb_init("zoning", "")
     rb_init("zoning_req", "")
     rb_init("zoning_comments", "Legal")
+    rb_init("improvements_narrative", "")
     rb_init("electricity", True)
     rb_init("heating_fuel", "Gas")
     rb_init("water_type", "Public")
@@ -1901,6 +1931,16 @@ with tab_report:
                 st.success("Zoning saved to library.")
 
         st.divider()
+        st.markdown("**Improvements Narrative**")
+        st.session_state.rb_improvements_narrative = st.text_area(
+            "Additional Improvements Commentary",
+            st.session_state.rb_improvements_narrative,
+            height=100,
+            placeholder="e.g. The subject has an oil tank located in the basement. "
+                        "No seepage noted at the time of inspection. Within the past 8 years "
+                        "the kitchen, flooring, basement and roof were updated...")
+
+        st.divider()
         st.markdown("**Interior Room Photos**")
         st.caption("Slots auto-generate based on room counts. Label each room and upload a photo.")
 
@@ -2154,88 +2194,144 @@ with tab_report:
     # SECTION 5 — COMPARABLE SALES
     # ══════════════════════════════════════════════════════════════════════
     elif active_idx == 4:
-        st.markdown("### Comparable Sales Data")
-        st.info("Upload your MLS comp CSV from Spark/MLS — same file you already pull.")
+        st.markdown("### Comparable Sales Analysis")
 
-        comp_csv = st.file_uploader("Upload Comp CSV", type=["csv"], key="rb_comp_csv")
-        if comp_csv:
-            try:
-                df_c = pd.read_csv(comp_csv)
-                st.success(f"Loaded {len(df_c)} rows")
-                st.session_state["rb_comp_df"] = df_c.to_json()
-                st.session_state["rb_comp_columns"] = list(df_c.columns)
-            except Exception as e:
-                st.error(f"CSV error: {e}")
+        # ── Adjustment Methodology ────────────────────────────────────────
+        st.markdown("#### Adjustment Methodology")
+        st.caption("State your adjustment rates and how they were derived. This section appears at the top of the comp analysis in the report.")
 
-        if st.session_state.get("rb_comp_df"):
-            df_c = pd.read_json(st.session_state["rb_comp_df"])
-            cols = st.session_state.get("rb_comp_columns", list(df_c.columns))
+        comments = load_data("comments_data","rc_comments.json", DEFAULT_COMMENTS)
+        adj_comments = [c for c in comments if any(x in c["category"].lower()
+                         for x in ["adjustment","gla","line item"])]
+        lib_pull("Adjustment Language", adj_comments, "adj_methodology")
 
-            st.dataframe(df_c, use_container_width=True)
-
-            # Column mapping dropdowns
-            st.markdown("**Map CSV columns to comp fields:**")
-            cc1, cc2, cc3, cc4 = st.columns(4)
-            col_opts = ["(skip)"] + cols
-            with cc1:
-                st.session_state["rb_col_address"] = st.selectbox(
-                    "Address column", col_opts,
-                    index=col_opts.index(st.session_state.get("rb_col_address","(skip)"))
-                          if st.session_state.get("rb_col_address") in col_opts else 0,
-                    key="col_map_addr")
-            with cc2:
-                st.session_state["rb_col_price"] = st.selectbox(
-                    "Sale Price column", col_opts,
-                    index=col_opts.index(st.session_state.get("rb_col_price","(skip)"))
-                          if st.session_state.get("rb_col_price") in col_opts else 0,
-                    key="col_map_price")
-            with cc3:
-                st.session_state["rb_col_gla"] = st.selectbox(
-                    "GLA column", col_opts,
-                    index=col_opts.index(st.session_state.get("rb_col_gla","(skip)"))
-                          if st.session_state.get("rb_col_gla") in col_opts else 0,
-                    key="col_map_gla")
-            with cc4:
-                st.session_state["rb_col_date"] = st.selectbox(
-                    "Sale Date column", col_opts,
-                    index=col_opts.index(st.session_state.get("rb_col_date","(skip)"))
-                          if st.session_state.get("rb_col_date") in col_opts else 0,
-                    key="col_map_date")
-
-            # Auto-populate comp addresses from CSV
-            addr_col = st.session_state.get("rb_col_address","(skip)")
-            if addr_col != "(skip)" and addr_col in df_c.columns:
-                csv_addresses = df_c[addr_col].astype(str).tolist()
-                for i, addr in enumerate(csv_addresses[:10]):
-                    key = f"rb_comp_addr_{i}"
-                    if key not in st.session_state or not st.session_state[key]:
-                        st.session_state[key] = addr
+        if "rb_adj_methodology" not in st.session_state:
+            st.session_state.rb_adj_methodology = ""
+        st.session_state.rb_adj_methodology = st.text_area(
+            "Adjustment Methodology Statement",
+            st.session_state.rb_adj_methodology,
+            height=120,
+            placeholder="e.g. Adjustments made: $35 per SF GLA over 50 sf, Bedrooms adj @ $5,000, Full Bath adj @ $3,000, Basement adj @ $10,000, Garage adj @ $10,000 per stall. All adjustments are market-derived via paired sales analysis...")
 
         st.divider()
-        st.markdown("**Number of Comps**")
+
+        # ── Number of comps ───────────────────────────────────────────────
         st.session_state.rb_num_comps = st.number_input(
-            "How many comps?", min_value=1, max_value=10,
+            "Number of Comparable Sales", min_value=1, max_value=10,
             value=int(st.session_state.rb_num_comps), step=1,
             key="num_comps_input")
 
         st.divider()
-        st.markdown("**Comp Photo Uploads**")
+
+        # ── Individual comp entries ───────────────────────────────────────
+        st.markdown("#### Comparable Sales")
         for i in range(int(st.session_state.rb_num_comps)):
-            with st.expander(f"Comparable #{i+1}"):  # starts at 1
-                addr_key = f"rb_comp_addr_{i}"
-                if addr_key not in st.session_state:
-                    st.session_state[addr_key] = ""
-                st.session_state[addr_key] = st.text_input(
-                    f"Comp #{i+1} Address",
-                    st.session_state[addr_key],
-                    key=f"comp_addr_inp_{i}")
-                f = st.file_uploader(
-                    f"Comp #{i+1} Exterior Photo",
-                    type=["jpg","jpeg","png"],
-                    key=f"comp_photo_up_{i}")
+            with st.expander(f"Comparable #{i+1}", expanded=(i==0)):
+
+                # Core fields row 1
+                ca1, ca2, ca3 = st.columns(3)
+                with ca1:
+                    addr_key = f"rb_comp_addr_{i}"
+                    if addr_key not in st.session_state:
+                        st.session_state[addr_key] = ""
+                    st.session_state[addr_key] = st.text_input(
+                        "Address", st.session_state[addr_key],
+                        key=f"comp_addr_inp_{i}")
+                with ca2:
+                    price_key = f"rb_comp_price_{i}"
+                    if price_key not in st.session_state:
+                        st.session_state[price_key] = ""
+                    st.session_state[price_key] = st.text_input(
+                        "Sale Price ($)", st.session_state[price_key],
+                        key=f"comp_price_{i}", placeholder="e.g. 550,000")
+                with ca3:
+                    date_key = f"rb_comp_date_{i}"
+                    if date_key not in st.session_state:
+                        st.session_state[date_key] = ""
+                    st.session_state[date_key] = st.text_input(
+                        "Sale Date", st.session_state[date_key],
+                        key=f"comp_date_{i}", placeholder="e.g. 01/02/2025")
+
+                # Core fields row 2
+                cb1, cb2, cb3, cb4 = st.columns(4)
+                with cb1:
+                    gla_key = f"rb_comp_gla_{i}"
+                    if gla_key not in st.session_state:
+                        st.session_state[gla_key] = ""
+                    st.session_state[gla_key] = st.text_input(
+                        "GLA (sf)", st.session_state[gla_key],
+                        key=f"comp_gla_{i}")
+                with cb2:
+                    bed_key = f"rb_comp_beds_{i}"
+                    if bed_key not in st.session_state:
+                        st.session_state[bed_key] = ""
+                    st.session_state[bed_key] = st.text_input(
+                        "Beds", st.session_state[bed_key],
+                        key=f"comp_beds_{i}")
+                with cb3:
+                    bath_key = f"rb_comp_baths_{i}"
+                    if bath_key not in st.session_state:
+                        st.session_state[bath_key] = ""
+                    st.session_state[bath_key] = st.text_input(
+                        "Baths", st.session_state[bath_key],
+                        key=f"comp_baths_{i}")
+                with cb4:
+                    adj_key = f"rb_comp_adj_{i}"
+                    if adj_key not in st.session_state:
+                        st.session_state[adj_key] = ""
+                    st.session_state[adj_key] = st.text_input(
+                        "Net Adjustment ($)", st.session_state[adj_key],
+                        key=f"comp_adj_{i}", placeholder="e.g. +15,000")
+
+                adjval_key = f"rb_comp_adjval_{i}"
+                if adjval_key not in st.session_state:
+                    st.session_state[adjval_key] = ""
+                st.session_state[adjval_key] = st.text_input(
+                    "Adjusted Value ($)", st.session_state[adjval_key],
+                    key=f"comp_adjval_{i}", placeholder="e.g. 629,585")
+
+                # Narrative description
+                desc_key = f"rb_comp_desc_{i}"
+                if desc_key not in st.session_state:
+                    st.session_state[desc_key] = ""
+                st.session_state[desc_key] = st.text_area(
+                    "Comp Description & Adjustment Narrative",
+                    st.session_state[desc_key],
+                    height=100,
+                    key=f"comp_desc_{i}",
+                    placeholder="e.g. Comparable #1 is located 0.86 miles SW of the subject. "
+                                "The sale is a Ranch style home in Average condition. "
+                                "A positive adjustment was applied for inferior condition per MLS. "
+                                "An adjustment was made for GLA differential and basement type...")
+
+                # Photo
+                f = st.file_uploader(f"Exterior Photo",
+                                      type=["jpg","jpeg","png"],
+                                      key=f"comp_photo_up_{i}")
                 if f:
                     save_photo(f"comp_{i}", f)
                 show_saved_photo(f"comp_{i}", f"Comp #{i+1}")
+
+        st.divider()
+
+        # ── Reconciliation narrative ──────────────────────────────────────
+        st.markdown("#### Sales Comparison Reconciliation")
+        st.caption("Describe the weight given to each comparable and how you arrived at your indicated value.")
+
+        recon_comments = [c for c in comments if any(x in c["category"].lower()
+                           for x in ["reconcil","weight","approach"])]
+        lib_pull("Reconciliation Language", recon_comments, "comp_reconciliation")
+
+        if "rb_comp_reconciliation" not in st.session_state:
+            st.session_state.rb_comp_reconciliation = ""
+        st.session_state.rb_comp_reconciliation = st.text_area(
+            "Sales Comparison Reconciliation",
+            st.session_state.rb_comp_reconciliation,
+            height=120,
+            placeholder="e.g. The appraiser has verified each sale with MLS data and city records. "
+                        "Most weight has been placed on Comparables #1 and #3 as they are most "
+                        "similar to the subject in terms of style, size, age, and condition. "
+                        "The final opinion of value is within the indicated range, rounded...")
 
     # ══════════════════════════════════════════════════════════════════════
     # SECTION 6 — MAPS
