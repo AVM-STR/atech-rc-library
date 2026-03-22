@@ -321,7 +321,7 @@ def generate_gp_res_pdf(ss):
     story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=12))
 
     # Photo left + info right
-    front_file = ss.get("rb_photo_front")
+    front_file = ss.get("rb_photo_bytes_front")
     photo_cell = img_cell(front_file, 3.1*inch, 2.2*inch, "[ FRONT EXTERIOR ]")
 
     lk = S("lk2", fontName="Helvetica-Bold", fontSize=8.5, textColor=DARK_GRAY,
@@ -723,8 +723,11 @@ def generate_gp_res_pdf(ss):
         [HRFlowable(width=2.8*inch, thickness=0.75, color=BLACK)],
         [Paragraph("Spencer Webb", S("sn3", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))],
         [Paragraph("A-Tech Appraisal Co., LLC", fv)],
-        [Paragraph("License #CRA.0060031  |  State of Rhode Island", fv)],
-        [Paragraph("Expires: 05/03/2026", fv)],
+        [Paragraph(
+            f"License #{ss.get('rb_active_lic_num','CRA.0060031')}  |  "
+            f"State of {('Rhode Island' if ss.get('rb_active_lic_state','RI')=='RI' else 'Massachusetts')}  |  "
+            f"Exp: {ss.get('rb_active_lic_exp','05/03/2026')}",
+            fv)],
         [Paragraph(f"Date of Report: {rpt_date}", fv)],
         [Paragraph(f"Inspection: {insp_type}  |  {insp_date}", fv)],
         [Spacer(1, 0.12*inch)],
@@ -1353,8 +1356,11 @@ def generate_gp_res_pdf(ss):
         [HRFlowable(width=2.8*inch, thickness=0.75, color=BLACK)],
         [Paragraph("Spencer Webb", S("sn3", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))],
         [Paragraph("A-Tech Appraisal Co., LLC", fv)],
-        [Paragraph("License #CRA.0060031  |  State of Rhode Island", fv)],
-        [Paragraph("Expires: 05/03/2026", fv)],
+        [Paragraph(
+            f"License #{ss.get('rb_active_lic_num','CRA.0060031')}  |  "
+            f"State of {('Rhode Island' if ss.get('rb_active_lic_state','RI')=='RI' else 'Massachusetts')}  |  "
+            f"Exp: {ss.get('rb_active_lic_exp','05/03/2026')}",
+            fv)],
         [Paragraph(f"Date of Report: {rpt_date}", fv)],
         [Paragraph(f"Inspection: {insp_type}  |  {insp_date}", fv)],
         [Spacer(1, 0.12*inch)],
@@ -2110,6 +2116,7 @@ with tab_report:
     rb_init("scope_of_work", "The appraiser performed an interior and exterior inspection of the subject property at the client's request. A thorough investigation of available data was completed including public records, multiple listing services, brokers, owners, the inspection of the subject property itself, and other qualified sources where applicable. When conflicting information was collected, the source deemed most reliable by industry standards was utilized. All dimensions taken from assessor's field card of subject.")
     rb_init("limiting_conditions", "Not a Home Inspection: This appraisal is not a home inspection. The appraiser performed a visual inspection of accessible areas only and cannot be relied upon to disclose conditions or defects. A professional home inspection is recommended.\n\nAdverse Environmental Conditions: No apparent adverse environmental conditions were observed on the date of inspection. The presence of hazardous substances such as radon or lead paint cannot be determined during an appraisal inspection.\n\nAge Adjustments: Comparables were not adjusted for actual age differences. In this market, buyers base purchase decisions on condition rather than actual age. Condition ratings reflect effective age.\n\nMechanical Systems: Heating, plumbing, and electrical systems appear in proper working order based on visual observation only.")
     rb_init("inspection_type", "Interior & Exterior")
+    rb_init("license_state", "RI")
     rb_init("inspection_date", date.today().isoformat())
     rb_init("report_date", date.today().isoformat())
 
@@ -2898,9 +2905,58 @@ with tab_report:
             ).isoformat()
 
             st.divider()
-            st.markdown("**Appraiser Info**")
-            st.info("Spencer Webb  |  A-Tech Appraisal Co., LLC  |  "
-                    "CRA.0060031  |  RI  |  Expires: 05/03/2026")
+            st.markdown("**Appraisal State & License**")
+
+            # Load saved license info from disk
+            LIC_FILE = os.path.join(os.path.dirname(__file__), "appraiser_licenses.json")
+            default_licenses = {
+                "RI": {"num": "CRA.0060031", "exp": "05/03/2026", "type": "Certified Residential Appraiser"},
+                "MA": {"num": "AR018847",    "exp": "11/10/2025", "type": "Certified Residential Appraiser"},
+            }
+            if os.path.exists(LIC_FILE):
+                with open(LIC_FILE) as _lf:
+                    saved_licenses = json.load(_lf)
+            else:
+                saved_licenses = default_licenses.copy()
+
+            lic_state = st.radio("State this appraisal is in", ["RI", "MA"],
+                                  index=["RI","MA"].index(st.session_state.rb_license_state),
+                                  horizontal=True, key="lic_state_radio")
+            st.session_state.rb_license_state = lic_state
+
+            lic_info = saved_licenses.get(lic_state, default_licenses[lic_state])
+
+            st.divider()
+            st.caption("License info auto-filled from saved settings. Edit below and click Save to update.")
+            lc1, lc2, lc3 = st.columns(3)
+            with lc1:
+                edit_num = st.text_input(f"{lic_state} License #",
+                                          lic_info.get("num",""), key="edit_lic_num")
+            with lc2:
+                edit_exp = st.text_input(f"{lic_state} Expiration",
+                                          lic_info.get("exp",""), key="edit_lic_exp",
+                                          placeholder="MM/DD/YYYY")
+            with lc3:
+                edit_type = st.text_input(f"{lic_state} License Type",
+                                           lic_info.get("type","Certified Residential Appraiser"),
+                                           key="edit_lic_type")
+
+            if st.button(f"💾 Save {lic_state} License Info for Future Use"):
+                saved_licenses[lic_state] = {"num": edit_num, "exp": edit_exp, "type": edit_type}
+                with open(LIC_FILE, "w") as _lf:
+                    json.dump(saved_licenses, _lf)
+                st.success(f"{lic_state} license info saved — will auto-fill on future reports.")
+                st.rerun()
+
+            # Store active license values in session for PDF
+            st.session_state["rb_active_lic_num"]  = edit_num
+            st.session_state["rb_active_lic_exp"]  = edit_exp
+            st.session_state["rb_active_lic_type"] = edit_type
+            st.session_state["rb_active_lic_state"] = lic_state
+
+            st.divider()
+            st.info(f"Spencer Webb  |  A-Tech Appraisal Co., LLC  |  "
+                    f"License: {edit_num}  |  {lic_state}  |  Expires: {edit_exp}")
 
         with col2:
             st.markdown("**License / Certification Image**")
