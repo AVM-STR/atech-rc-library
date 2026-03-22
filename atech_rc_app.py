@@ -260,8 +260,11 @@ def generate_gp_res_pdf(ss):
         if file_obj is None:
             return PhotoBox(w, h, label)
         try:
-            file_obj.seek(0)
-            img_data = file_obj.read()
+            if isinstance(file_obj, bytes):
+                img_data = file_obj
+            else:
+                file_obj.seek(0)
+                img_data = file_obj.read()
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
             tmp.write(img_data)
             tmp.close()
@@ -429,652 +432,68 @@ def generate_gp_res_pdf(ss):
     story.append(banner("SUBJECT PROPERTY PHOTOS"))
     story.append(Spacer(1, 0.12*inch))
 
-    # Exterior 3-up
+    # Exterior 3-up — bytes keys
     ext_row = Table([[
-        img_cell(ss.get("rb_photo_front"), 2.3*inch, 1.7*inch, "[ FRONT EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_rear"),  2.3*inch, 1.7*inch, "[ REAR EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_street"),2.3*inch, 1.7*inch, "[ STREET SCENE ]"),
+        img_cell(ss.get("rb_photo_bytes_front"),  2.3*inch, 1.7*inch, "[ FRONT EXTERIOR ]"),
+        img_cell(ss.get("rb_photo_bytes_rear"),   2.3*inch, 1.7*inch, "[ REAR EXTERIOR ]"),
+        img_cell(ss.get("rb_photo_bytes_street"), 2.3*inch, 1.7*inch, "[ STREET SCENE ]"),
     ]], colWidths=[2.4*inch]*3)
     ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
     story.append(ext_row)
     story.append(Spacer(1, 0.1*inch))
 
-    # Interior room photos
-    room_photos = ss.get("rb_room_photos", [])
-    if room_photos:
-        for i in range(0, len(room_photos), 3):
-            batch = room_photos[i:i+3]
-            while len(batch) < 3:
-                batch.append({"label":"","file":None})
-            row = Table([[
-                Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f'[ {b["label"].upper()} ]')],
-                       [Paragraph(b["label"],
-                                   S("rl", fontName="Helvetica", fontSize=7.5,
-                                     textColor=MID_GRAY, alignment=TA_CENTER))]],
-                      colWidths=[2.35*inch])
-                for b in batch
-            ]], colWidths=[2.4*inch]*3)
-            row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-            story.append(row)
+    # Dynamic room/bath/basement photos from bytes keys
+    try:
+        n_rooms = int(ss.get("rb_total_rooms") or 0)
+        n_full  = int(ss.get("rb_bathrooms_full") or 0)
+        n_half  = int(ss.get("rb_bathrooms_half") or 0)
+        n_bsmt  = int(ss.get("rb_basement_fin_rooms") or 0)
+    except (ValueError, TypeError):
+        n_rooms = n_full = n_half = n_bsmt = 0
+
+    room_labels_default = ["Kitchen","Living Room","Dining Room","Primary Bedroom",
+                            "Bedroom 2","Bedroom 3","Bedroom 4","Den","Office",
+                            "Family Room","Sunroom","Other Room"]
+
+    def photo_batch_row(items):
+        while len(items) < 3:
+            items.append({"label":"","key":None})
+        row_cells = []
+        for it in items:
+            photo = ss.get(it["key"]) if it["key"] else None
+            lbl   = it["label"] or ""
+            cell  = Table([
+                [img_cell(photo, 2.25*inch, 1.65*inch, f"[ {lbl.upper()} ]")],
+                [Paragraph(lbl, S(f"rlbl_{lbl[:8]}", fontName="Helvetica",
+                            fontSize=7.5, textColor=MID_GRAY, alignment=TA_CENTER))],
+            ], colWidths=[2.35*inch])
+            row_cells.append(cell)
+        r = Table([row_cells], colWidths=[2.4*inch]*3)
+        r.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
+                                ("RIGHTPADDING",(0,0),(-1,-1),3)]))
+        return r
+
+    if n_rooms > 0:
+        items = [{"label": ss.get(f"rb_room_label_{i}",
+                   room_labels_default[i] if i < len(room_labels_default) else f"Room {i+1}"),
+                  "key": f"rb_photo_bytes_room_{i}"} for i in range(n_rooms)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
             story.append(Spacer(1, 0.08*inch))
 
-    story.append(Spacer(1, 0.1*inch))
-    story.append(sub_banner("IMPROVEMENTS DESCRIPTION"))
-    story.append(Spacer(1, 0.12*inch))
-
-    amenities_str = ", ".join(ss.get("rb_amenities",[]) or ["None noted"])
-    bsmt_type = ss.get("rb_basement_type","—")
-    bsmt_sf   = ss.get("rb_basement_sf","")
-    bsmt_fin  = ss.get("rb_basement_fin_sf","")
-    bsmt_rms  = ss.get("rb_basement_fin_rooms","")
-    bsmt_str  = bsmt_type
-    if bsmt_sf:
-        bsmt_str += f" — {bsmt_sf} sf"
-    if bsmt_fin and bsmt_fin != "0":
-        bsmt_str += f" / {bsmt_fin} sf finished"
-        if bsmt_rms:
-            bsmt_str += f" ({bsmt_rms} rooms)"
-
-    story.append(detail_grid(
-        [("STYLE / DESIGN", f"{ss.get('rb_style_attach','')} — {ss.get('rb_style_floors','')} Story {ss.get('rb_style_type','')}"),
-         ("GROSS LIVING AREA", f"{ss.get('rb_gla','—')} sq ft above grade"),
-         ("ROOM COUNT", f"{ss.get('rb_total_rooms','—')} rooms — {ss.get('rb_bedrooms','—')} bed, {ss.get('rb_bathrooms_full','—')} full bath, {ss.get('rb_bathrooms_half','0')} half bath"),
-         ("BASEMENT", bsmt_str),
-         ("AMENITIES", amenities_str)],
-        [("YEAR BUILT", ss.get("rb_year_built","—")),
-         ("PARKING", ss.get("rb_parking","—")),
-         ("LOT SIZE", ss.get("rb_lot_size","—")),
-         ("ZONING", f"{ss.get('rb_zoning','')} — {ss.get('rb_zoning_req','')}"),
-         ("ZONING STATUS", ss.get("rb_zoning_comments","—"))]
-    ))
-
-    story.append(PageBreak())
-
-    # ══ PAGE 3: CONDITION & NEIGHBORHOOD ═════════════════════════════════
-    story.append(banner("PROPERTY DESCRIPTION & RATING"))
-    story.append(Spacer(1, 0.12*inch))
-
-    cond_text = ss.get("rb_condition_narrative","")
-    if cond_text:
-        story.append(Paragraph(cond_text, body))
-
-    story.append(Spacer(1, 0.1*inch))
-    story.append(four_stats([
-        ("CONDITION RATING", ss.get("rb_condition_rating","—").split(" — ")[0]),
-        ("QUALITY RATING",   ss.get("rb_quality_rating","—").split(" — ")[0]),
-        ("YEAR BUILT",       ss.get("rb_year_built","—")),
-        ("GROSS LIVING AREA",f"{ss.get('rb_gla','—')} sf"),
-    ]))
-    story.append(Spacer(1, 0.18*inch))
-
-    story.append(sub_banner("NEIGHBORHOOD & MARKET CONDITIONS"))
-    story.append(Spacer(1, 0.1*inch))
-
-    hood = ss.get("rb_neighborhood_desc","")
-    if hood:
-        story.append(Paragraph(hood, body))
-    mkt = ss.get("rb_market_desc","")
-    if mkt:
-        story.append(Paragraph(mkt, body))
-
-    story.append(Spacer(1, 0.1*inch))
-    story.append(four_stats([
-        ("MARKET CONDITIONS", ss.get("rb_market_conditions","Stable")),
-        ("SUPPLY / DEMAND",   ss.get("rb_supply_demand","—")),
-        ("MARKETING TIME",    ss.get("rb_marketing_time","—")),
-        ("GROWTH RATE",       ss.get("rb_growth_rate","—")),
-    ]))
-    story.append(Spacer(1, 0.12*inch))
-
-    # Housing trends
-    pl = ss.get("rb_price_low","")
-    ph = ss.get("rb_price_high","")
-    pp = ss.get("rb_price_pred","")
-    al = ss.get("rb_age_low","")
-    ah = ss.get("rb_age_high","")
-    ap = ss.get("rb_age_pred","")
-    if any([pl, ph, pp, al, ah, ap]):
-        story.append(sub_banner("ONE-UNIT HOUSING TRENDS"))
-        story.append(Spacer(1,0.08*inch))
-        story.append(detail_grid(
-            [("PRICE LOW", pl), ("PRICE HIGH", ph), ("PRICE PREDOMINANT", pp)],
-            [("AGE LOW (YRS)", al), ("AGE HIGH (YRS)", ah), ("AGE PREDOMINANT (YRS)", ap)]
-        ))
-    story.append(PageBreak())
-
-    # ══ PAGE 4: COMPS ══════════════════════════════════════════════════════
-    story.append(banner("COMPARABLE SALES ANALYSIS"))
-    story.append(Spacer(1, 0.12*inch))
-
-    comp_df_json = ss.get("rb_comp_df")
-    if comp_df_json:
-        try:
-            import pandas as pd
-            df = pd.read_json(comp_df_json)
-            # Build a clean table from the CSV
-            cols = list(df.columns)
-            header = [Paragraph(str(c)[:20], S("ch2", fontName="Helvetica-Bold",
-                        fontSize=7, textColor=WHITE, alignment=TA_CENTER))
-                      for c in cols[:8]]
-            rows = [header]
-            for _, row in df.head(6).iterrows():
-                rows.append([Paragraph(str(row[c])[:25],
-                              S("cd2", fontName="Helvetica", fontSize=7.5,
-                                textColor=DARK_GRAY))
-                             for c in cols[:8]])
-            cw_comp = 7.2*inch / min(8, len(cols))
-            ct = Table(rows, colWidths=[cw_comp]*min(8,len(cols)), repeatRows=1)
-            ct.setStyle(TableStyle([
-                ("BACKGROUND",(0,0),(-1,0),BLACK),
-                ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE, VERY_LIGHT]),
-                ("BOX",(0,0),(-1,-1),0.5,LIGHT_GRAY),
-                ("INNERGRID",(0,0),(-1,-1),0.3,LIGHT_GRAY),
-                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
-                ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
-                ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ]))
-            story.append(ct)
-        except Exception as e:
-            story.append(Paragraph(f"Comp data error: {e}", body))
-    else:
-        story.append(Paragraph("No comparable sales CSV uploaded.", body))
-
-    # Comp photos
-    story.append(Spacer(1, 0.15*inch))
-    story.append(sub_banner("COMPARABLE SALE PHOTOS"))
-    story.append(Spacer(1, 0.1*inch))
-    comp_batch = []
-    for i in range(5):
-        f = ss.get(f"rb_comp_photo_{i}")
-        addr = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
-        comp_batch.append({"file":f, "label":addr})
-    for i in range(0, 5, 3):
-        batch = comp_batch[i:i+3]
-        while len(batch) < 3:
-            batch.append({"file":None,"label":""})
-        row = Table([[
-            Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f"[ COMP #{i+j+1} ]")],
-                   [Paragraph(b["label"][:30],
-                               S("cl2", fontName="Helvetica", fontSize=7,
-                                 textColor=MID_GRAY, alignment=TA_CENTER))]],
-                  colWidths=[2.35*inch])
-            for j, b in enumerate(batch)
-        ]], colWidths=[2.4*inch]*3)
-        row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-        story.append(row)
-        story.append(Spacer(1, 0.08*inch))
-
-    story.append(PageBreak())
-
-    # ══ PAGE 5: MAPS ══════════════════════════════════════════════════════
-    story.append(banner("MAPS"))
-    story.append(Spacer(1, 0.12*inch))
-
-    maps_row = Table([[
-        Table([[Paragraph("Plat Map", S("maplbl", fontName="Helvetica-Bold", fontSize=8,
-                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_plat_map_file"), 3.4*inch, 2.5*inch, "[ PLAT MAP ]")]],
-              colWidths=[3.5*inch]),
-        Table([[Paragraph("Comparable Sales Map", S("maplbl2", fontName="Helvetica-Bold",
-                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_comp_map_file"), 3.4*inch, 2.5*inch, "[ COMP MAP ]")]],
-              colWidths=[3.5*inch]),
-    ]], colWidths=[3.6*inch, 3.6*inch])
-    maps_row.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
-    ]))
-    story.append(maps_row)
-    story.append(PageBreak())
-
-    # ══ PAGE 6: RECONCILIATION & VALUE ════════════════════════════════════
-    story.append(banner("FINAL VALUE CONCLUSION & RECONCILIATION"))
-    story.append(Spacer(1, 0.12*inch))
-
-    recon = ss.get("rb_reconciliation","")
-    if recon:
-        story.append(Paragraph(recon, body))
-
-    # Final value banner
-    fv_t = Table([[
-        Paragraph("FINAL OPINION OF MARKET VALUE",
-                  S("fvl2", fontName="Helvetica-Bold", fontSize=11, textColor=WHITE)),
-        Paragraph(f"AS OF {eff_dt.upper()}",
-                  S("fvd2", fontName="Helvetica", fontSize=9,
-                    textColor=colors.HexColor("#BBBBBB"), alignment=TA_RIGHT)),
-    ],[
-        Paragraph(value_str or "—",
-                  S("fvv2", fontName="Helvetica-Bold", fontSize=26, textColor=WHITE)),
-        Paragraph("",S("fvw2", fontName="Helvetica", fontSize=9, textColor=WHITE)),
-    ]], colWidths=[4.8*inch, 2.4*inch])
-    fv_t.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,-1),BLACK),
-        ("TOPPADDING",(0,0),(-1,0),12),("BOTTOMPADDING",(0,0),(-1,0),6),
-        ("TOPPADDING",(0,1),(-1,1),4),("BOTTOMPADDING",(0,1),(-1,1),14),
-        ("LEFTPADDING",(0,0),(-1,-1),14),("RIGHTPADDING",(0,0),(-1,-1),14),
-        ("VALIGN",(0,0),(-1,0),"BOTTOM"),("VALIGN",(0,1),(-1,1),"TOP"),
-    ]))
-    story.append(fv_t)
-    story.append(PageBreak())
-
-    # ══ PAGE 7: SKETCH ════════════════════════════════════════════════════
-    story.append(banner("FLOOR PLAN / SKETCH"))
-    story.append(Spacer(1, 0.12*inch))
-
-    sketch_row = Table([[
-        Table([[Paragraph("Above Grade", S("sktl", fontName="Helvetica-Bold", fontSize=8,
-                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_sketch_ag_file"), 3.4*inch, 3.0*inch, "[ ABOVE GRADE FLOOR PLAN ]")]],
-              colWidths=[3.5*inch]),
-        Table([[Paragraph("Basement / Below Grade", S("sktl2", fontName="Helvetica-Bold",
-                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
-               [img_cell(ss.get("rb_sketch_bg_file"), 3.4*inch, 3.0*inch, "[ BASEMENT FLOOR PLAN ]")]],
-              colWidths=[3.5*inch]),
-    ]], colWidths=[3.6*inch, 3.6*inch])
-    sketch_row.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
-    ]))
-    story.append(sketch_row)
-    story.append(PageBreak())
-
-    # ══ PAGE 8: SCOPE & LIMITING CONDITIONS ═══════════════════════════════
-    story.append(banner("SCOPE OF WORK"))
-    story.append(Spacer(1, 0.1*inch))
-    sow = ss.get("rb_scope_of_work","")
-    if sow:
-        story.append(Paragraph(sow, body))
-
-    story.append(Spacer(1, 0.15*inch))
-    story.append(sub_banner("LIMITING CONDITIONS"))
-    story.append(Spacer(1, 0.1*inch))
-
-    lc_text = ss.get("rb_limiting_conditions","")
-    for para in lc_text.split("\n\n"):
-        if para.strip():
-            story.append(Paragraph(para.strip(), body))
-    story.append(PageBreak())
-
-    # ══ FINAL PAGE: CERTIFICATION & SIGNATURE ═════════════════════════════
-    story.append(banner("APPRAISER CERTIFICATION & SIGNATURE"))
-    story.append(Spacer(1, 0.15*inch))
-
-    # USPAP certification text
-    cert_text = (
-        "I certify that, to the best of my knowledge and belief: the statements of fact contained in this "
-        "report are true and correct; the reported analyses, opinions, and conclusions are limited only by "
-        "the reported assumptions and limiting conditions and are my personal, impartial, and unbiased "
-        "professional analyses, opinions, and conclusions; I have no present or prospective interest in the "
-        "property that is the subject of this report; my engagement in this assignment was not contingent "
-        "upon developing or reporting predetermined results; my compensation is not contingent upon the "
-        "development or reporting of a predetermined value; and this report was prepared in conformity with "
-        "the Uniform Standards of Professional Appraisal Practice."
-    )
-    story.append(Paragraph(cert_text, body))
-    story.append(Spacer(1, 0.15*inch))
-
-    rpt_date  = ss.get("rb_report_date","")
-    insp_date = ss.get("rb_inspection_date","")
-    insp_type = ss.get("rb_inspection_type","Interior & Exterior")
-
-    sig_left = Table([
-        [Paragraph("APPRAISER", fl)],
-        [Spacer(1, 0.35*inch)],
-        [HRFlowable(width=2.8*inch, thickness=0.75, color=BLACK)],
-        [Paragraph("Spencer Webb", S("sn3", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))],
-        [Paragraph("A-Tech Appraisal Co., LLC", fv)],
-        [Paragraph(
-            f"License #{ss.get('rb_active_lic_num','CRA.0060031')}  |  "
-            f"State of {('Rhode Island' if ss.get('rb_active_lic_state','RI')=='RI' else 'Massachusetts')}  |  "
-            f"Exp: {ss.get('rb_active_lic_exp','05/03/2026')}",
-            fv)],
-        [Paragraph(f"Date of Report: {rpt_date}", fv)],
-        [Paragraph(f"Inspection: {insp_type}  |  {insp_date}", fv)],
-        [Spacer(1, 0.12*inch)],
-        [Paragraph("CLIENT / INTENDED USER", fl)],
-        [Paragraph(ss.get("rb_intended_user",""), S("cn3", fontName="Helvetica-Bold",
-                    fontSize=11, textColor=BLACK))],
-    ], colWidths=[3.4*inch])
-    sig_left.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
-    ]))
-
-    lic_file = ss.get("rb_license_file")
-    lic_img  = img_cell(lic_file, 3.3*inch, 2.3*inch, "[ APPRAISER LICENSE ]")
-    lic_note = Paragraph(
-        "Rhode Island Department of Business Regulation\nDivision of Commercial Licensing",
-        S("ln2", fontName="Helvetica", fontSize=7.5, textColor=MID_GRAY,
-          alignment=TA_CENTER, leading=11, spaceBefore=5))
-
-    sig_right = Table([
-        [Paragraph("STATE LICENSE", S("ll2", fontName="Helvetica-Bold", fontSize=8,
-                    textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=6))],
-        [lic_img],
-        [lic_note],
-    ], colWidths=[3.5*inch])
-    sig_right.setStyle(TableStyle([
-        ("ALIGN",(0,0),(-1,-1),"CENTER"),
-        ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
-    ]))
-
-    story.append(Table([[sig_left, sig_right]], colWidths=[3.6*inch, 3.6*inch]))
-
-    def footer(canvas, doc):
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7.5)
-        canvas.setFillColor(MID_GRAY)
-        canvas.drawString(0.65*inch, 0.38*inch,
-            f"A-Tech Appraisal Co., LLC  |  CRA.0060031  |  {addr1}, {addr2}  |  Confidential Appraisal Report")
-        canvas.drawRightString(W-0.65*inch, 0.38*inch, f"Page {doc.page}")
-        canvas.restoreState()
-
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
-    buf.seek(0)
-    return buf.read()
-
-
-
-def generate_gp_res_pdf(ss):
-    """Generate GP Residential PDF from session state."""
-    buf = io.BytesIO()
-
-    # Colors
-    BLACK      = colors.HexColor("#0A0A0A")
-    DARK_GRAY  = colors.HexColor("#222222")
-    MID_GRAY   = colors.HexColor("#666666")
-    LIGHT_GRAY = colors.HexColor("#CCCCCC")
-    VERY_LIGHT = colors.HexColor("#F2F2F2")
-    WHITE      = colors.white
-    W, H       = letter
-
-    def S(name, **kw):
-        return ParagraphStyle(name, **kw)
-
-    body  = S("body", fontName="Helvetica", fontSize=9.5, textColor=DARK_GRAY,
-               leading=15, alignment=TA_JUSTIFY, spaceAfter=6)
-    fl    = S("fl", fontName="Helvetica-Bold", fontSize=8, textColor=MID_GRAY, spaceAfter=1)
-    fv    = S("fv", fontName="Helvetica", fontSize=10, textColor=DARK_GRAY, spaceAfter=5)
-    sl    = S("sl", fontName="Helvetica", fontSize=7.5, textColor=MID_GRAY, spaceAfter=1)
-    sv    = S("sv", fontName="Helvetica-Bold", fontSize=8.5, textColor=DARK_GRAY, spaceAfter=3)
-
-    def banner(text, dark=True, w=7.2*inch):
-        bg = BLACK if dark else DARK_GRAY
-        t = Table([[Paragraph(text, S("bh", fontName="Helvetica-Bold",
-                    fontSize=11, textColor=WHITE))]], colWidths=[w])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),bg),
-            ("LEFTPADDING",(0,0),(-1,-1),10),
-            ("TOPPADDING",(0,0),(-1,-1),7),
-            ("BOTTOMPADDING",(0,0),(-1,-1),7),
-        ]))
-        return t
-
-    def sub_banner(text, w=7.2*inch):
-        t = Table([[Paragraph(text, S("sbh", fontName="Helvetica-Bold",
-                    fontSize=10, textColor=WHITE))]], colWidths=[w])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),MID_GRAY),
-            ("LEFTPADDING",(0,0),(-1,-1),10),
-            ("TOPPADDING",(0,0),(-1,-1),6),
-            ("BOTTOMPADDING",(0,0),(-1,-1),6),
-        ]))
-        return t
-
-    def stat_card(label, value, width=1.75*inch):
-        t = Table([[Paragraph(label, S("sclabel", fontName="Helvetica", fontSize=7.5,
-                               textColor=MID_GRAY, alignment=TA_CENTER))],
-                   [Paragraph(value, S("scvalue", fontName="Helvetica-Bold", fontSize=10,
-                               textColor=BLACK, alignment=TA_CENTER))]],
-                  colWidths=[width])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,-1),VERY_LIGHT),
-            ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
-            ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("BOX",(0,0),(-1,-1),0.75,LIGHT_GRAY),
-        ]))
-        return t
-
-    def four_stats(items):
-        row = [stat_card(l, v, 1.8*inch) for l,v in items]
-        t = Table([row], colWidths=[1.8*inch]*4)
-        t.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
-                                ("RIGHTPADDING",(0,0),(-1,-1),3)]))
-        return t
-
-    def detail_grid(left, right):
-        rows = []
-        for i in range(max(len(left), len(right))):
-            ll, lv = left[i]  if i < len(left)  else ("","")
-            rl, rv = right[i] if i < len(right) else ("","")
-            rows.append([Paragraph(ll,fl), Paragraph(lv,fv),
-                         Paragraph(rl,fl), Paragraph(rv,fv)])
-        t = Table(rows, colWidths=[1.35*inch, 2.2*inch, 1.35*inch, 2.2*inch])
-        t.setStyle(TableStyle([
-            ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("LEFTPADDING",(2,0),(2,-1),16),
-        ]))
-        return t
-
-    def img_cell(file_obj, w, h, label="[ PHOTO ]"):
-        """Convert uploaded file to RLImage or placeholder."""
-        class PhotoBox(Flowable):
-            def __init__(self, width, height, lbl):
-                Flowable.__init__(self)
-                self.width = width; self.height = height; self.lbl = lbl
-            def draw(self):
-                c = self.canv
-                c.setFillColor(colors.HexColor("#DDDDDD"))
-                c.setStrokeColor(colors.HexColor("#BBBBBB"))
-                c.setLineWidth(0.5)
-                c.roundRect(0, 0, self.width, self.height, 3, fill=1, stroke=1)
-                c.setFont("Helvetica", 8)
-                c.setFillColor(colors.HexColor("#888888"))
-                c.drawCentredString(self.width/2, self.height/2-5, self.lbl)
-
-        if file_obj is None:
-            return PhotoBox(w, h, label)
-        try:
-            if isinstance(file_obj, bytes):
-                img_data = file_obj
-            else:
-                file_obj.seek(0)
-                img_data = file_obj.read()
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-            tmp.write(img_data)
-            tmp.close()
-            return RLImage(tmp.name, width=w, height=h)
-        except Exception:
-            return PhotoBox(w, h, label)
-
-    doc = SimpleDocTemplate(buf, pagesize=letter,
-        rightMargin=0.65*inch, leftMargin=0.65*inch,
-        topMargin=0.65*inch, bottomMargin=0.65*inch)
-
-    story = []
-    addr1  = ss.get("rb_address1","")
-    addr2  = ss.get("rb_address2","")
-    eff_dt = ss.get("rb_effective_date","")
-    value  = ss.get("rb_opinion_value","")
-    value_str = f"${value}" if value and not value.startswith("$") else value
-
-    # ══ PAGE 1: COVER ══════════════════════════════════════════════════════
-    # Logo header
-    logo_path = os.path.join(os.path.dirname(__file__), "atech_logo.png")
-    if os.path.exists(logo_path):
-        logo = RLImage(logo_path, width=2.2*inch, height=0.48*inch)
-    else:
-        logo = Paragraph("A-TECH APPRAISAL CO., LLC",
-                          S("lgf", fontName="Helvetica-Bold", fontSize=12, textColor=BLACK))
-
-    contact = Table([
-        [Paragraph("P.O. Box 9464, Warwick, RI 02889",
-                   S("c1", fontName="Helvetica", fontSize=8.5,
-                     textColor=DARK_GRAY, alignment=TA_RIGHT))],
-        [Paragraph("(401) 921-4055  |  www.a-techappraisal.com",
-                   S("c2", fontName="Helvetica", fontSize=8.5,
-                     textColor=DARK_GRAY, alignment=TA_RIGHT))],
-    ], colWidths=[4.9*inch])
-    contact.setStyle(TableStyle([
-        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
-    ]))
-
-    hdr = Table([[logo, contact]], colWidths=[2.3*inch, 4.9*inch])
-    hdr.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
-        ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
-    ]))
-    story.append(hdr)
-    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY,
-                            spaceBefore=8, spaceAfter=10))
-
-    # Report title
-    story.append(Paragraph("Residential Appraisal Report",
-        S("title", fontName="Helvetica-Bold", fontSize=16,
-          textColor=BLACK, spaceAfter=2)))
-    story.append(Paragraph("Opinion of Market Value — Fee Simple Interest",
-        S("sub", fontName="Helvetica", fontSize=10,
-          textColor=MID_GRAY, spaceAfter=8)))
-    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=12))
-
-    # Photo left + info right
-    front_file = ss.get("rb_photo_bytes_front") or ss.get("rb_photo_front")
-    photo_cell = img_cell(front_file, 3.1*inch, 2.2*inch, "[ FRONT EXTERIOR ]")
-
-    lk = S("lk2", fontName="Helvetica-Bold", fontSize=8.5, textColor=DARK_GRAY,
-            spaceAfter=1, spaceBefore=3)
-    lv2 = S("lv2", fontName="Helvetica", fontSize=9, textColor=BLACK,
-             spaceAfter=0)
-
-    style_text = f"{ss.get('rb_style_attach','')} {ss.get('rb_style_floors','')} Story {ss.get('rb_style_type','')}"
-    beds  = ss.get("rb_bedrooms","—")
-    baths = ss.get("rb_bathrooms_full","—")
-    half  = ss.get("rb_bathrooms_half","0")
-    bath_str = f"{baths} Full" + (f"  |  {half} Half" if half and half != "0" else "")
-
-    info_rows = [
-        [Paragraph("<b>Subject Property:</b>", lk), ""],
-        [Paragraph(addr1, S("adr", fontName="Helvetica-Bold", fontSize=13,
-                             textColor=BLACK, spaceAfter=1)), ""],
-        [Paragraph(addr2, lv2), ""],
-        [Paragraph("<b>Style:</b>", lk), Paragraph(style_text.strip(), lv2)],
-        [Paragraph("<b>Living Area:</b>", lk), Paragraph(f"{ss.get('rb_gla','—')} sq ft", lv2)],
-        [Paragraph("<b>Bedrooms / Baths:</b>", lk), Paragraph(f"{beds} Bedrooms  |  {bath_str}", lv2)],
-        [Paragraph("<b>Year Built:</b>", lk), Paragraph(ss.get("rb_year_built","—"), lv2)],
-        [Paragraph("<b>Property Rights:</b>", lk), Paragraph(ss.get("rb_property_rights","Fee Simple"), lv2)],
-        [Paragraph("<b>Tax Year / Amount:</b>", lk),
-         Paragraph(f"{ss.get('rb_tax_year','—')}  |  ${ss.get('rb_tax_amount','—')}", lv2)],
-        [Paragraph("<b>Effective Date:</b>", lk), Paragraph(eff_dt, lv2)],
-        [Paragraph("<b>Prepared By:</b>", lk),
-         Paragraph("Spencer Webb, CRA  |  A-Tech Appraisal Co., LLC", lv2)],
-    ]
-    info_t = Table(info_rows, colWidths=[1.5*inch, 2.35*inch])
-    info_t.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
-        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),4),
-    ]))
-
-    top_t = Table([[photo_cell, info_t]], colWidths=[3.2*inch, 4.0*inch])
-    top_t.setStyle(TableStyle([
-        ("VALIGN",(0,0),(-1,-1),"TOP"),
-        ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
-        ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
-        ("RIGHTPADDING",(0,0),(0,-1),16),
-        ("LEFTPADDING",(1,0),(1,-1),6),
-    ]))
-    story.append(top_t)
-    story.append(Spacer(1, 12))
-
-    # Summary metrics box
-    story.append(Paragraph("Appraisal Summary",
-        S("h1s", fontName="Helvetica-Bold", fontSize=11,
-          textColor=BLACK, spaceAfter=6)))
-
-    ml = S("ml2", fontName="Helvetica", fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER)
-    mv = S("mv2", fontName="Helvetica-Bold", fontSize=14, textColor=BLACK,
-            alignment=TA_CENTER, leading=18)
-    cw = 7.2*inch/3
-    cond  = ss.get("rb_condition_rating","—")
-    gla   = ss.get("rb_gla","")
-    try:
-        ppsf = f"${int(value.replace(',','').replace('$','')) / int(gla.replace(',','')):.0f}/sf" if value and gla else "—"
-    except Exception:
-        ppsf = "—"
-
-    mx = Table([
-        [Paragraph("Opinion of Market Value", ml),
-         Paragraph("Price Per Sq Ft", ml),
-         Paragraph("Condition", ml)],
-        [Paragraph(value_str or "—", mv),
-         Paragraph(ppsf, mv),
-         Paragraph(cond.split(" — ")[0] if "—" in cond else cond, mv)],
-        [Paragraph("Intended Use", ml),
-         Paragraph("Effective Date", ml),
-         Paragraph("Inspection Type", ml)],
-        [Paragraph(ss.get("rb_intended_use","Market Value")[:30], mv),
-         Paragraph(eff_dt, mv),
-         Paragraph(ss.get("rb_inspection_type","Interior & Exterior"), mv)],
-    ], colWidths=[cw]*3)
-    mx.setStyle(TableStyle([
-        ("BOX",(0,0),(-1,-1),0.75,LIGHT_GRAY),
-        ("INNERGRID",(0,0),(-1,-1),0.5,LIGHT_GRAY),
-        ("BACKGROUND",(0,0),(-1,-1),VERY_LIGHT),
-        ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
-        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
-    ]))
-    story.append(mx)
-    story.append(Spacer(1, 10))
-
-    # Prepared for / USPAP footer
-    story.append(HRFlowable(width="100%", thickness=0.5, color=LIGHT_GRAY, spaceAfter=6))
-    story.append(Paragraph(
-        f"Prepared for: <b>{ss.get('rb_intended_user','')}</b>  |  "
-        f"Intended Use: <b>{ss.get('rb_intended_use','')}</b>  |  "
-        f"Property Rights: <b>{ss.get('rb_property_rights','Fee Simple')}</b>",
-        S("pfooter", fontName="Helvetica", fontSize=8, textColor=MID_GRAY,
-          leading=12)))
-    story.append(Paragraph(
-        "This appraisal was developed in conformity with USPAP. The opinion of value is as of the "
-        "stated effective date and is contingent upon the certification and limiting conditions attached.",
-        S("ufooter", fontName="Helvetica", fontSize=8, textColor=MID_GRAY,
-          alignment=TA_JUSTIFY, leading=12)))
-
-    story.append(PageBreak())
-
-    # ══ PAGE 2: SUBJECT PHOTOS & IMPROVEMENTS ════════════════════════════
-    story.append(banner("SUBJECT PROPERTY PHOTOS"))
-    story.append(Spacer(1, 0.12*inch))
-
-    # Exterior 3-up
-    ext_row = Table([[
-        img_cell(ss.get("rb_photo_front"), 2.3*inch, 1.7*inch, "[ FRONT EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_rear"),  2.3*inch, 1.7*inch, "[ REAR EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_street"),2.3*inch, 1.7*inch, "[ STREET SCENE ]"),
-    ]], colWidths=[2.4*inch]*3)
-    ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-    story.append(ext_row)
-    story.append(Spacer(1, 0.1*inch))
-
-    # Interior room photos
-    room_photos = ss.get("rb_room_photos", [])
-    if room_photos:
-        for i in range(0, len(room_photos), 3):
-            batch = room_photos[i:i+3]
-            while len(batch) < 3:
-                batch.append({"label":"","file":None})
-            row = Table([[
-                Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f'[ {b["label"].upper()} ]')],
-                       [Paragraph(b["label"],
-                                   S("rl", fontName="Helvetica", fontSize=7.5,
-                                     textColor=MID_GRAY, alignment=TA_CENTER))]],
-                      colWidths=[2.35*inch])
-                for b in batch
-            ]], colWidths=[2.4*inch]*3)
-            row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-            story.append(row)
+    total_baths = n_full + n_half
+    if total_baths > 0:
+        items = [{"label": f"Full Bath {i+1}" if i < n_full else f"Half Bath {i-n_full+1}",
+                  "key": f"rb_photo_bytes_bath_{i}"} for i in range(total_baths)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
+            story.append(Spacer(1, 0.08*inch))
+
+    if n_bsmt > 0:
+        items = [{"label": ss.get(f"rb_bsmt_label_{i}", f"Basement Room {i+1}"),
+                  "key": f"rb_photo_bytes_bsmt_{i}"} for i in range(n_bsmt)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
             story.append(Spacer(1, 0.08*inch))
 
     story.append(Spacer(1, 0.1*inch))
