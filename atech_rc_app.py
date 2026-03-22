@@ -428,76 +428,8 @@ def generate_gp_res_pdf(ss):
 
     story.append(PageBreak())
 
-    # ══ PAGE 2: SUBJECT PHOTOS & IMPROVEMENTS ════════════════════════════
-    story.append(banner("SUBJECT PROPERTY PHOTOS"))
-    story.append(Spacer(1, 0.12*inch))
-
-    # Exterior 3-up — bytes keys
-    ext_row = Table([[
-        img_cell(ss.get("rb_photo_bytes_front"),  2.3*inch, 1.7*inch, "[ FRONT EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_bytes_rear"),   2.3*inch, 1.7*inch, "[ REAR EXTERIOR ]"),
-        img_cell(ss.get("rb_photo_bytes_street"), 2.3*inch, 1.7*inch, "[ STREET SCENE ]"),
-    ]], colWidths=[2.4*inch]*3)
-    ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-    story.append(ext_row)
-    story.append(Spacer(1, 0.1*inch))
-
-    # Dynamic room/bath/basement photos from bytes keys
-    try:
-        n_rooms = int(ss.get("rb_total_rooms") or 0)
-        n_full  = int(ss.get("rb_bathrooms_full") or 0)
-        n_half  = int(ss.get("rb_bathrooms_half") or 0)
-        n_bsmt  = int(ss.get("rb_basement_fin_rooms") or 0)
-    except (ValueError, TypeError):
-        n_rooms = n_full = n_half = n_bsmt = 0
-
-    room_labels_default = ["Kitchen","Living Room","Dining Room","Primary Bedroom",
-                            "Bedroom 2","Bedroom 3","Bedroom 4","Den","Office",
-                            "Family Room","Sunroom","Other Room"]
-
-    def photo_batch_row(items):
-        while len(items) < 3:
-            items.append({"label":"","key":None})
-        row_cells = []
-        for it in items:
-            photo = ss.get(it["key"]) if it["key"] else None
-            lbl   = it["label"] or ""
-            cell  = Table([
-                [img_cell(photo, 2.25*inch, 1.65*inch, f"[ {lbl.upper()} ]")],
-                [Paragraph(lbl, S(f"rlbl_{lbl[:8]}", fontName="Helvetica",
-                            fontSize=7.5, textColor=MID_GRAY, alignment=TA_CENTER))],
-            ], colWidths=[2.35*inch])
-            row_cells.append(cell)
-        r = Table([row_cells], colWidths=[2.4*inch]*3)
-        r.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
-                                ("RIGHTPADDING",(0,0),(-1,-1),3)]))
-        return r
-
-    if n_rooms > 0:
-        items = [{"label": ss.get(f"rb_room_label_{i}",
-                   room_labels_default[i] if i < len(room_labels_default) else f"Room {i+1}"),
-                  "key": f"rb_photo_bytes_room_{i}"} for i in range(n_rooms)]
-        for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.08*inch))
-
-    total_baths = n_full + n_half
-    if total_baths > 0:
-        items = [{"label": f"Full Bath {i+1}" if i < n_full else f"Half Bath {i-n_full+1}",
-                  "key": f"rb_photo_bytes_bath_{i}"} for i in range(total_baths)]
-        for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.08*inch))
-
-    if n_bsmt > 0:
-        items = [{"label": ss.get(f"rb_bsmt_label_{i}", f"Basement Room {i+1}"),
-                  "key": f"rb_photo_bytes_bsmt_{i}"} for i in range(n_bsmt)]
-        for i in range(0, len(items), 3):
-            story.append(photo_batch_row(items[i:i+3]))
-            story.append(Spacer(1, 0.08*inch))
-
-    story.append(Spacer(1, 0.1*inch))
-    story.append(sub_banner("IMPROVEMENTS DESCRIPTION"))
+    # ══ PAGE 2: IMPROVEMENTS ═════════════════════════════════════════════
+    story.append(banner("IMPROVEMENTS DESCRIPTION"))
     story.append(Spacer(1, 0.12*inch))
 
     amenities_list = list(ss.get("rb_amenities") or [])
@@ -630,31 +562,6 @@ def generate_gp_res_pdf(ss):
             story.append(Paragraph(f"Comp data error: {e}", body))
     else:
         story.append(Paragraph("No comparable sales CSV uploaded.", body))
-
-    # Comp photos
-    story.append(Spacer(1, 0.15*inch))
-    story.append(sub_banner("COMPARABLE SALE PHOTOS"))
-    story.append(Spacer(1, 0.1*inch))
-    comp_batch = []
-    for i in range(5):
-        f = ss.get(f"rb_photo_bytes_comp_{i}") or ss.get(f"rb_comp_photo_{i}")
-        addr = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
-        comp_batch.append({"file":f, "label":addr})
-    for i in range(0, 5, 3):
-        batch = comp_batch[i:i+3]
-        while len(batch) < 3:
-            batch.append({"file":None,"label":""})
-        row = Table([[
-            Table([[img_cell(b["file"], 2.25*inch, 1.65*inch, f"[ COMP #{i+j+1} ]")],
-                   [Paragraph(b["label"][:40],
-                               S("cl2", fontName="Helvetica", fontSize=7,
-                                 textColor=MID_GRAY, alignment=TA_CENTER))]],
-                  colWidths=[2.35*inch])
-            for j, b in enumerate(batch)
-        ]], colWidths=[2.4*inch]*3)
-        row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
-        story.append(row)
-        story.append(Spacer(1, 0.08*inch))
 
     story.append(PageBreak())
 
@@ -811,6 +718,140 @@ def generate_gp_res_pdf(ss):
     ]))
 
     story.append(Table([[sig_left, sig_right]], colWidths=[3.6*inch, 3.6*inch]))
+
+
+    # ══ PHOTO APPENDIX — SUBJECT PHOTOS ══════════════════════════════════
+    story.append(PageBreak())
+    story.append(banner("SUBJECT PROPERTY PHOTOS"))
+    story.append(Spacer(1, 0.12*inch))
+
+    # Exterior 3-up with labels
+    ext_labels = ["Subject Front", "Subject Rear", "Subject Street"]
+    ext_keys   = ["rb_photo_bytes_front", "rb_photo_bytes_rear", "rb_photo_bytes_street"]
+    ext_cells  = []
+    for lbl, key in zip(ext_labels, ext_keys):
+        cell = Table([
+            [img_cell(ss.get(key), 2.25*inch, 1.8*inch, f"[ {lbl.upper()} ]")],
+            [Paragraph(lbl, S(f"ext_{key}", fontName="Helvetica-Bold", fontSize=8,
+                               textColor=DARK_GRAY, alignment=TA_CENTER))],
+        ], colWidths=[2.35*inch])
+        ext_cells.append(cell)
+    ext_row = Table([ext_cells], colWidths=[2.4*inch]*3)
+    ext_row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3)]))
+    story.append(ext_row)
+    story.append(Spacer(1, 0.12*inch))
+
+    # Room/bath/basement photos — dynamic
+    try:
+        n_rooms = int(ss.get("rb_total_rooms") or 0)
+        n_full  = int(ss.get("rb_bathrooms_full") or 0)
+        n_half  = int(ss.get("rb_bathrooms_half") or 0)
+        n_bsmt  = int(ss.get("rb_basement_fin_rooms") or 0)
+    except (ValueError, TypeError):
+        n_rooms = n_full = n_half = n_bsmt = 0
+
+    room_labels_default = ["Kitchen","Living Room","Dining Room","Primary Bedroom",
+                            "Bedroom 2","Bedroom 3","Bedroom 4","Den","Office",
+                            "Family Room","Sunroom","Other Room"]
+
+    def photo_batch_row(items):
+        while len(items) < 3:
+            items.append({"label":"","key":None})
+        row_cells = []
+        for it in items:
+            photo = ss.get(it["key"]) if it["key"] else None
+            lbl   = it["label"] or ""
+            cell  = Table([
+                [img_cell(photo, 2.25*inch, 1.75*inch, f"[ {lbl.upper()} ]")],
+                [Paragraph(lbl, S(f"rlbl_{lbl[:8]}", fontName="Helvetica",
+                            fontSize=7.5, textColor=MID_GRAY, alignment=TA_CENTER))],
+            ], colWidths=[2.35*inch])
+            row_cells.append(cell)
+        r = Table([row_cells], colWidths=[2.4*inch]*3)
+        r.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
+                                ("RIGHTPADDING",(0,0),(-1,-1),3)]))
+        return r
+
+    if n_rooms > 0:
+        story.append(sub_banner("INTERIOR — ABOVE GRADE"))
+        story.append(Spacer(1, 0.08*inch))
+        items = [{"label": ss.get(f"rb_room_label_{i}",
+                   room_labels_default[i] if i < len(room_labels_default) else f"Room {i+1}"),
+                  "key": f"rb_photo_bytes_room_{i}"} for i in range(n_rooms)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
+            story.append(Spacer(1, 0.1*inch))
+
+    total_baths = n_full + n_half
+    if total_baths > 0:
+        story.append(sub_banner("BATHROOMS"))
+        story.append(Spacer(1, 0.08*inch))
+        items = [{"label": f"Full Bath {i+1}" if i < n_full else f"Half Bath {i-n_full+1}",
+                  "key": f"rb_photo_bytes_bath_{i}"} for i in range(total_baths)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
+            story.append(Spacer(1, 0.1*inch))
+
+    if n_bsmt > 0:
+        story.append(sub_banner("BASEMENT"))
+        story.append(Spacer(1, 0.08*inch))
+        items = [{"label": ss.get(f"rb_bsmt_label_{i}", f"Basement Room {i+1}"),
+                  "key": f"rb_photo_bytes_bsmt_{i}"} for i in range(n_bsmt)]
+        for i in range(0, len(items), 3):
+            story.append(photo_batch_row(items[i:i+3]))
+            story.append(Spacer(1, 0.1*inch))
+
+    # ══ PHOTO APPENDIX — COMPARABLE SALE PHOTOS ══════════════════════════
+    num_comps = int(ss.get("rb_num_comps", 3))
+    comp_batch = []
+    for i in range(num_comps):
+        f    = ss.get(f"rb_photo_bytes_comp_{i}")
+        addr = ss.get(f"rb_comp_addr_{i}", f"Comparable #{i+1}")
+        comp_batch.append({"file": f, "label": addr})
+
+    if any(b["file"] for b in comp_batch):
+        story.append(PageBreak())
+        story.append(banner("COMPARABLE SALE PHOTOS"))
+        story.append(Spacer(1, 0.12*inch))
+        for i in range(0, len(comp_batch), 3):
+            batch = comp_batch[i:i+3]
+            while len(batch) < 3:
+                batch.append({"file": None, "label": ""})
+            row = Table([[
+                Table([[img_cell(b["file"], 2.25*inch, 1.75*inch,
+                                  f"[ COMP #{i+j+1} ]")],
+                       [Paragraph(b["label"][:40],
+                                   S(f"cl_{i+j}", fontName="Helvetica", fontSize=7,
+                                     textColor=MID_GRAY, alignment=TA_CENTER))]],
+                      colWidths=[2.35*inch])
+                for j, b in enumerate(batch)
+            ]], colWidths=[2.4*inch]*3)
+            row.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),3),
+                                      ("RIGHTPADDING",(0,0),(-1,-1),3)]))
+            story.append(row)
+            story.append(Spacer(1, 0.1*inch))
+
+    # ══ PHOTO APPENDIX — FLOOR PLAN / SKETCH ══════════════════════════════
+    story.append(PageBreak())
+    story.append(banner("FLOOR PLAN / SKETCH"))
+    story.append(Spacer(1, 0.12*inch))
+    sketch_row = Table([[
+        Table([[Paragraph("Above Grade", S("sktl", fontName="Helvetica-Bold", fontSize=8,
+                           textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_sketch_ag"), 3.4*inch, 3.2*inch,
+                          "[ ABOVE GRADE FLOOR PLAN ]")]],
+              colWidths=[3.5*inch]),
+        Table([[Paragraph("Basement / Below Grade", S("sktl2", fontName="Helvetica-Bold",
+                           fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER, spaceAfter=4))],
+               [img_cell(ss.get("rb_photo_bytes_sketch_bg"), 3.4*inch, 3.2*inch,
+                          "[ BASEMENT FLOOR PLAN ]")]],
+              colWidths=[3.5*inch]),
+    ]], colWidths=[3.6*inch, 3.6*inch])
+    sketch_row.setStyle(TableStyle([
+        ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
+    ]))
+    story.append(sketch_row)
 
     def footer(canvas, doc):
         canvas.saveState()
