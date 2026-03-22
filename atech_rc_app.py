@@ -142,16 +142,17 @@ if not check_password():
 # ── Header ────────────────────────────────────────────────────────────────────
 if os.path.exists(LOGO_PATH):
     st.image(LOGO_PATH, width=200)
-st.title("Revision & Comment Library")
-st.caption("Search, copy, and manage revision responses and appraisal addendum comments.")
+st.title("A-Tech Appraisal Co. — Field Reference")
+st.caption("Revision responses, addendum comments, neighborhood descriptions, zoning data, and UAD 3.6 reference.")
 st.divider()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_rev, tab_com, tab_hood, tab_zone = st.tabs([
+tab_rev, tab_com, tab_hood, tab_zone, tab_uad = st.tabs([
     "📋 Revision Responses",
     "📝 Appraisal Comments",
     "🏘️ Neighborhood Descriptions",
-    "📐 Zoning Districts"
+    "📐 Zoning Districts",
+    "🆕 UAD 3.6 Reference"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -525,3 +526,256 @@ with tab_zone:
                     st.rerun()
     else:
         st.info("No zoning districts saved yet. Add your first entry above.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — UAD 3.6 REFERENCE
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_uad:
+    st.subheader("🆕 UAD 3.6 Reference Guide")
+    st.caption("Key changes, inspection requirements, ratings definitions, and tool overview. Mandatory November 2, 2026.")
+
+    st.info("⏱️ **Key Dates:** Broad Production started Jan 26, 2026 — both 2.6 and 3.6 accepted now. **Mandatory Nov 2, 2026** — all legacy forms (1004, 1073, 2055, etc.) retired. UAD 2.6 pipeline fully retired May 3, 2027.")
+
+    uad_sub1, uad_sub2, uad_sub3, uad_sub4 = st.tabs([
+        "📊 What Changed vs 2.6",
+        "🔍 New Inspection Data",
+        "🏠 C & Q Ratings",
+        "💻 Report Writing Tools"
+    ])
+
+    # ── WHAT CHANGED ─────────────────────────────────────────────────────────
+    with uad_sub1:
+        st.markdown("### Overall vs UAD 2.6 — same, changed, new, or gone")
+
+        col_leg1, col_leg2, col_leg3, col_leg4 = st.columns(4)
+        with col_leg1: st.success("🟢 Same")
+        with col_leg2: st.warning("🟡 Changed")
+        with col_leg3: st.info("🔵 New")
+        with col_leg4: st.error("🔴 Gone")
+
+        sections = {
+            "Forms & Report Structure": [
+                ("🟡", "Form selection", "Single dynamic URAR replaces 1004, 1073, 2055, and all legacy forms. Sections turn on/off based on property/assignment type. No more form numbers."),
+                ("🔴", "1004MC Market Conditions form", "Eliminated entirely. Market conditions are now embedded in the URAR Market section as structured fields. Time adjustments still required and must be supported with data — just not the MC grid format."),
+                ("🟡", "Scope of work", "Still required. More structured fields, less free-text narrative. The analytical obligation is unchanged."),
+            ],
+            "Condition & Quality Ratings": [
+                ("🟡", "C1–C6 Condition scale", "Now three separate ratings: Exterior Condition + Interior Condition → reconciled to Overall. Previously one rating for the whole property."),
+                ("🟡", "Q1–Q6 Quality scale", "Same structure change — Exterior Quality + Interior Quality → Overall. Quality is still absolute, not relative to your market."),
+                ("🟢", "C6 rule", "If any component is C6, overall must be C6. Unchanged. Fannie allows C5 as-is in some cases; Freddie requires C4 minimum for delivery."),
+                ("🟡", "Defects documentation", "When C5 or C6: now requires itemized structured list — location, description, impact on soundness, recommended action, estimated repair cost. Previously narrative only."),
+                ("🔵", "As-Is + Subject-to-Repair ratings", "When repairs required, must report BOTH the As-Is Overall Condition AND the Condition Subject to Repair as separate explicit ratings."),
+            ],
+            "Kitchen & Bathroom Reporting": [
+                ("🔴", "'Not updated / Updated / Remodeled' checkbox", "Retired entirely. Replaced by structured Kitchen and Bathroom Details sections."),
+                ("🟡", "Kitchen reporting", "Per-kitchen structured section: update status + approximate year of update + condition rating (C1–C6) + brief description. Every kitchen reported individually."),
+                ("🟡", "Bathroom reporting", "Per-bathroom structured section: same as kitchen. Every bathroom including half baths reported individually."),
+            ],
+            "Site & Location": [
+                ("🟡", "View / location influence", "Replaced by Site Influence section. Now captures: onsite / bordering / distant AND positive / neutral / negative. A pond on the lot vs a lake view from a distance are now distinct reportable data points."),
+                ("🟡", "Zoning, utilities, site features", "Significantly expanded structured fields. The Site section is 30 pages in the URAR Reference Guide — second largest chapter after the Sales Comparison Approach."),
+            ],
+            "Sales Comparison Approach": [
+                ("🟢", "Comparable selection and analysis", "Same process, same professional judgment required. More structured fields, less free-text narrative."),
+                ("🟡", "Time adjustments", "1004MC is gone. Time adjustments still required when market warrants. Must be supported with market data. The decision to NOT adjust requires the same level of support as the decision to adjust."),
+                ("🟢", "Actual age in comp grid", "Only actual age in the grid. Effective age discussion moves to narrative commentary."),
+                ("🟡", "GLA measurement", "ANSI Z765-2021 formalized. Above-grade finished area must be broken out by floor. UCDP compliance rules will enforce ANSI logic on submission."),
+            ],
+            "Special Features": [
+                ("🔵", "ADU section", "New dedicated section. Effective Mar 21, 2026: expanded ADU eligibility ONLY available with UAD 3.6 submissions. ADU rental income can count toward qualifying income under certain conditions."),
+                ("🟡", "Manufactured housing terminology", "Effective Mar 31, 2026: 'single-width' and 'multi-width' replace 'single-section' and 'multi-section' in all UAD 3.6 reports."),
+            ],
+            "Core Appraisal Practice": [
+                ("🟢", "How value is estimated", "Exactly the same. UAD 3.6 changes how work is reported, not how value is estimated."),
+                ("🟢", "USPAP compliance", "Required and unchanged. UAD 3.6 is a reporting format change, not a USPAP change."),
+                ("🟢", "Physical inspection process", "The inspection itself does not change. What changes is the structured way you document and report what you observed."),
+                ("🟢", "Highest and best use analysis", "Same requirement, same analysis. Reporting format more structured."),
+                ("🟢", "Cost and income approaches", "Same analytical requirements. More structured data fields for reporting conclusions."),
+            ],
+        }
+
+        for section, items in sections.items():
+            st.markdown(f"**{section}**")
+            for status, title, detail in items:
+                with st.expander(f"{status} {title}"):
+                    st.write(detail)
+            st.write("")
+
+        st.caption("Source: Fannie Mae & Freddie Mac UAD Inspection and Reporting Tips (Oct 2025), UAD 3.6 FAQ, McKissock Learning, Working RE, Appraiser eLearning.")
+
+    # ── NEW INSPECTION DATA ───────────────────────────────────────────────────
+    with uad_sub2:
+        st.markdown("### New data you must collect at the inspection")
+        st.warning("UAD 3.6 requires significantly more structured data collected in the field. Plan your inspections accordingly — some of this requires new tools or conversations with the owner/agent that weren't necessary before.")
+
+        st.markdown("#### 🔧 Bring to every inspection")
+        tool_items = [
+            ("Laser distance measurer", "Required for ceiling height measurement — a tape measure and ladder is not practical or safe. Ceiling height is a required field every time (Report Field ID: 10.045)."),
+            ("Mobile device with UAD 3.6 software", "The volume of new structured data fields makes mobile data entry at the inspection far more efficient than clipboard + office entry. This is the workflow UAD 3.6 is built around."),
+        ]
+        for tool, note in tool_items:
+            with st.expander(f"🔧 {tool}"):
+                st.write(note)
+
+        st.markdown("#### 🔵 New — must now measure or collect")
+        new_items = [
+            ("Ceiling height (required every inspection)", "Required field — always. Tied to ANSI 7-foot rule: if more than half a room's area is under 7 ft, that area cannot count as finished GLA. Measure with a laser."),
+            ("Walls and ceiling materials/type", "Required structured field in Interior Features table — select from defined enumerations. Always displays, always required."),
+            ("Nonstandard Finished Area (NSFA)", "Finished space that doesn't meet ANSI must be measured and reported separately from GLA. Must explain why (e.g. 'sloping ceiling under 7 ft'). Common in finished attics, bonus rooms with knee walls."),
+            ("Roof replacement estimate", "New structured field — when was the roof last replaced? Ask the owner or agent at inspection. Can also pull from permit records."),
+            ("Outbuilding utilities", "If outbuildings present: which utilities have been extended to each (electric, water, HVAC, etc.)."),
+            ("Broadband internet availability", "Surprising new requirement. Verify via FCC broadband map or ask the owner. The GSE definition of 'broadband' is specific — check Appendix F-1 for the enumeration."),
+            ("Access road type", "New structured field — type of road providing access (public paved, private paved, gravel, dirt, etc.)."),
+            ("ADU detail (if present)", "New dedicated section — unit type, GLA, bed/bath count, kitchen presence, separate entrance, condition, and whether legally permitted. Collect all at inspection."),
+            ("Disaster mitigation features", "If present: storm shutters, hurricane straps, flood vents, seismic retrofitting. If this section is included, the commentary field is required."),
+        ]
+        for title, detail in new_items:
+            with st.expander(f"🔵 {title}"):
+                st.write(detail)
+
+        st.markdown("#### 🟡 Changed — process same, now structured")
+        changed_items = [
+            ("Above-grade finished area — per floor breakdown", "Previously reported as one total GLA number. Now must be broken out by floor — first floor, second floor, etc. UCDP will validate that floors sum to total."),
+            ("Kitchen update status — per kitchen", "Previously one checkbox. Now per-kitchen: update status + approximate year + condition rating + brief description."),
+            ("Bathroom update status — per bathroom", "Previously one checkbox. Now per-bathroom: same structured fields. Every bathroom including half baths."),
+            ("Exterior quality — separate from interior", "Assess separately: siding, roof, foundation, windows, trim, architectural detail. Record as its own rating."),
+            ("Exterior condition — separate from interior", "Assess separately: same components. Must reconcile with interior condition to reach overall rating."),
+            ("Interior quality — separate from exterior", "Assess separately: flooring, trim, cabinetry, fixtures, countertops, built-ins."),
+            ("Interior condition — separate from exterior", "Assess separately. If C5/C6: itemized defect list required."),
+            ("Site influence (view/location)", "Now captures: onsite / bordering / distant AND positive / neutral / negative. More granular than the old View field."),
+        ]
+        for title, detail in changed_items:
+            with st.expander(f"🟡 {title}"):
+                st.write(detail)
+
+        st.markdown("#### 🔴 Gone — no longer required")
+        gone_items = [
+            ("Street inspection of comparable sales", "No longer required. Front photo of comp still required but the physical drive-by has been retired. Photo can be sourced from MLS or other reliable source."),
+        ]
+        for title, detail in gone_items:
+            with st.expander(f"🔴 {title}"):
+                st.write(detail)
+
+        st.caption("Source: GSE Inspection and Reporting Tips (Oct 2025), Appendix F-1 URAR Reference Guide, ANSI Z765-2021.")
+
+    # ── C & Q RATINGS ────────────────────────────────────────────────────────
+    with uad_sub3:
+        st.markdown("### Condition Ratings (C1–C6)")
+        st.info("Key change: Condition is now reported separately for Exterior and Interior, then reconciled to an Overall rating. If ANY component is C6, the overall must be C6. Fannie allows C5 as-is in some cases; Freddie requires C4 minimum for loan delivery.")
+
+        conditions = [
+            ("C1", "New / Like New", "New or nearly new. No physical wear on any component. All major and minor elements are in like-new condition. Rebuilt homes may qualify if on a completely new foundation with fully remanufactured materials.", "Use for new construction and very recent gut rehabs to the studs. Rarely seen on resale."),
+            ("C2", "Extensive Renovation", "Extensively renovated to resemble new construction. Most components recently replaced or refinished. Minimal physical depreciation, no deferred maintenance, nothing requires repair.", "Component-level detail in 3.6 makes this harder to assign loosely. Every major system should be new or like-new. Kitchen and bathroom details must support it."),
+            ("C3", "Well Maintained / Updated", "Well maintained with limited physical depreciation. Some components may show minor wear but all functional systems are working properly. Some updating may be present.", "Most move-in ready properties with recent updates but not full renovation. Very common in well-maintained New England stock."),
+            ("C4", "Average / Adequate", "Adequately maintained with some physical depreciation. Normal wear and tear. All functional systems working. No immediate repairs required but may have deferred maintenance items.", "The baseline for typical resale. Dated but functional kitchens/baths, normal aging. Very common in pre-1970 RI/MA stock."),
+            ("C5", "Fair / Deferred Maintenance", "Obvious deferred maintenance and/or physical deterioration. Some components need repair or replacement. Major systems may be functional but near end of useful life.", "Freddie Mac: C5 is NOT eligible for delivery — must be repaired to C4. Fannie allows C5 as-is in some cases. Always check lender overlays. Requires itemized defect list in 3.6."),
+            ("C6", "Significant Damage / Safety Concern", "Significant damage, serious deferred maintenance, or conditions affecting safety, soundness, or structural integrity. Property may be uninhabitable or pose health/safety risks.", "If any single component is C6, the overall must be C6. Requires full itemized defect list with location, description, impact, recommended action, and estimated repair cost."),
+        ]
+
+        for code, label, definition, notes in conditions:
+            with st.expander(f"**{code} — {label}**"):
+                st.write(definition)
+                st.caption(f"📝 Field notes: {notes}")
+
+        st.divider()
+        st.markdown("### Quality Ratings (Q1–Q6)")
+        st.info("Key change: Quality is now reported separately for Exterior and Interior, then reconciled to an Overall rating. Quality is absolute — a Q3 is a Q3 whether it's in Providence or Newport. Local market norms do not determine quality rating.")
+
+        qualities = [
+            ("Q1", "Exceptional / Custom", "Custom architecture, outstanding workmanship, and premium materials throughout — often imported or specialty items. Every component shows exceptional detail and design.", "Very rare. Most markets have no Q1 properties. If you're questioning whether it's Q1, it probably isn't."),
+            ("Q2", "High Quality / Custom", "Still custom but not at the absolute top tier. High-quality materials and consistently strong workmanship. May be custom-built or part of a high-quality development.", "May be the highest rating seen in many markets. Common in higher-end coastal RI and South Shore MA."),
+            ("Q3", "Good Quality / Above Average", "Solidly constructed with good materials, though not custom throughout. Often includes upgraded finishes mixed with some standard components.", "The most common rating in the upper-middle price range. Upgraded kitchen and baths with standard framing and exterior."),
+            ("Q4", "Average / Standard", "Standard or builder-grade materials and construction. Meets code requirements. No significant upgrades. Represents the majority of production housing.", "The baseline for most residential construction. Colonial-era New England stock typically falls here despite age — quality is about construction, not condition."),
+            ("Q5", "Fair / Below Average", "Below-standard materials or workmanship. May show significant deficiencies in design, construction, or finish. Functional but lacks quality.", "Rare in typical residential lending. More common in older worker housing, self-built structures, or properties with significant deferred improvements."),
+            ("Q6", "Poor / Substandard", "Construction that may not meet basic building standards. Often built without professional oversight or adherence to modern codes. May be unsuitable for year-round habitation.", "Very rarely assigned. Flag immediately — lender eligibility issues are likely."),
+        ]
+
+        for code, label, definition, notes in qualities:
+            with st.expander(f"**{code} — {label}**"):
+                st.write(definition)
+                st.caption(f"📝 Field notes: {notes}")
+
+        st.caption("Source: McKissock Learning, Appendix F-1 URAR Reference Guide, Working RE — UAD Quality Equation (Aug 2025).")
+
+    # ── REPORT WRITING TOOLS ─────────────────────────────────────────────────
+    with uad_sub4:
+        st.markdown("### Report Writing Tools — A Guide for Newer Appraisers")
+
+        st.markdown("""
+The appraisal profession is going through its biggest technology shift in decades. UAD 3.6 changes not just what you report but how you collect data in the field — and a new generation of software tools has been built specifically around this new workflow. If you're newer to the profession, you have an advantage: you don't have 15 years of muscle memory to undo.
+        """)
+
+        st.divider()
+        st.markdown("#### The two categories of report-writing software")
+
+        col_trad, col_ai = st.columns(2)
+        with col_trad:
+            st.markdown("**Traditional platforms**")
+            st.caption("e.g. TOTAL by a la mode, ClickForms, ACI")
+            st.write("These have been the industry standard for decades. You enter data manually, build your report field by field, and write narrative addenda. They are being updated for UAD 3.6 but the core workflow — appraiser drives everything — stays the same.")
+            st.markdown("✅ Full control over every field  \n✅ Deep MLS and data integration  \n✅ Established, trusted by AMCs  \n✅ Large training community  \n❌ UAD 3.6 transition still in progress  \n❌ Monthly subscription cost")
+
+        with col_ai:
+            st.markdown("**AI-assisted platforms**")
+            st.caption("e.g. Automax, Aivre, ApprAIz")
+            st.write("A new wave of tools built from the ground up for UAD 3.6. These use AI and structured data to auto-populate fields, generate sketches, suggest comps, and flag compliance issues in real time. Both Automax and Aivre were featured at the 2026 UAD 3.6 Bootcamp alongside Fannie Mae and Freddie Mac.")
+            st.markdown("✅ Built for UAD 3.6 from day one  \n✅ Faster data entry in the field  \n✅ Real-time compliance checking  \n✅ Auto-populates structured fields  \n❌ Newer — less track record  \n❌ AMC acceptance varies by lender")
+
+        st.divider()
+        st.markdown("#### What AI actually does in appraisal software")
+
+        ai_items = [
+            ("Computer vision / scanning", "You walk through a property with your phone and the app uses the camera to measure rooms, generate a sketch, and identify features like flooring type, ceiling height, and condition. Some tools can do this in real time during the inspection walkthrough."),
+            ("Auto-population", "The software pulls property data from public records, MLS, and other sources and pre-fills report fields — address, lot size, year built, zoning, etc. — so it's already there when you open the assignment."),
+            ("Comp suggestion", "Algorithms scan MLS and public record data and suggest comparable sales based on proximity, size, age, condition, and other factors. You still select and verify each comp — the AI narrows the search, you make the call."),
+            ("Compliance checking", "The software flags UAD 3.6 rule violations before you submit — missing required fields, inconsistent C/Q ratings, data that doesn't pass UCDP logic checks. Catches errors before the reviewer does."),
+            ("What AI does NOT do", "AI does not form the opinion of value. The analysis, judgment, and professional conclusions are entirely yours. USPAP places that responsibility on the appraiser and no software changes that."),
+        ]
+
+        for title, detail in ai_items:
+            with st.expander(f"{'⚠️' if 'NOT' in title else '🤖'} {title}"):
+                st.write(detail)
+
+        st.divider()
+        st.markdown("#### Automax vs Aivre — balanced overview")
+        st.caption("Both were UAD 3.6 software demo participants at the 2026 Appraiser eLearning Bootcamp alongside Fannie Mae and Freddie Mac.")
+
+        col_am, col_av = st.columns(2)
+        with col_am:
+            st.markdown("**Automax**")
+            st.caption("Free platform — hybrid order network model")
+            st.write("Offers the platform at no cost in exchange for participation in their hybrid appraisal order network. Hybrid orders typically involve a reduced-scope inspection with the appraiser completing the valuation. Order acceptance is generally flexible.")
+            st.markdown("""
+**Features:**
+- Instant sketch generation
+- TOTAL data integration
+- MLS + public records + Zillow comp data
+- Cloud-stored USPAP-compliant workfile
+- UAD 3.6 on active roadmap
+
+**Consider if:** You want to reduce your software overhead and are open to hybrid assignments as part of your workflow.
+
+**Watch for:** UAD 3.6 deployment timeline — confirm current status with Automax directly before committing.
+            """)
+
+        with col_av:
+            st.markdown("**Aivre**")
+            st.caption("~$2,500/year — standalone subscription")
+            st.write("A standalone AI-assisted platform with a subscription model. Was an early mover on UAD 3.6 compliance. As of early 2026 did not include a sketch component — verify current feature set before evaluating as this space moves quickly.")
+            st.markdown("""
+**Features:**
+- UAD 3.6 compliant early
+- Purpose-built for new URAR
+- No order network obligations
+- Full control — standalone tool
+
+**Consider if:** You want a UAD 3.6-native platform with no strings attached and are willing to pay the subscription.
+
+**Watch for:** Sketch capability — this is a significant gap for UAD 3.6 field data collection. Confirm current status.
+            """)
+
+        st.divider()
+        st.info("**A note for newer appraisers:** Neither tool eliminates the need to understand the appraisal process. AI-assisted platforms speed up data collection and flag compliance issues, but they work best in the hands of someone who already understands what the fields mean, why certain adjustments are made, and what USPAP requires. The foundation comes first — the technology amplifies it. Start your UAD 3.6 education with Fannie Mae's free resources at **fanniemae.com/UAD** — specifically Appendix F-1 (375 pages, worth having as a searchable PDF).")
+
+        st.caption("Source: Appraiser eLearning 2026 UAD 3.6 Bootcamp, Working RE, McKissock Learning, Fannie Mae Appraiser Update (Jan 2026).")
