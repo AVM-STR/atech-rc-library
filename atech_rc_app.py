@@ -383,17 +383,13 @@ def generate_gp_res_pdf(ss):
     cw = 7.2*inch/3
     cond  = ss.get("rb_condition_rating","—")
     gla   = ss.get("rb_gla","")
-    try:
-        ppsf = f"${int(value.replace(',','').replace('$','')) / int(gla.replace(',','')):.0f}/sf" if value and gla else "—"
-    except Exception:
-        ppsf = "—"
 
     mx = Table([
         [Paragraph("Opinion of Market Value", ml),
-         Paragraph("Price Per Sq Ft", ml),
+         Paragraph("Owner", ml),
          Paragraph("Condition", ml)],
         [Paragraph(value_str or "—", mv),
-         Paragraph(ppsf, mv),
+         Paragraph(ss.get("rb_intended_user","—"), mv),
          Paragraph(cond.split(" — ")[0] if "—" in cond else cond, mv)],
         [Paragraph("Intended Use", ml),
          Paragraph("Effective Date", ml),
