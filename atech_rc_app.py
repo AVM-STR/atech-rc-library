@@ -159,13 +159,13 @@ st.caption("Revision responses, addendum comments, neighborhood descriptions, zo
 st.divider()
 
 
-tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_qc = st.tabs([
+tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_analyze = st.tabs([
     "📋 Revision Responses",
     "📝 Appraisal Comments",
     "🏘️ Neighborhood Descriptions",
     "📐 Zoning Districts",
     "🆕 UAD 3.6 Reference",
-    "✅ QC Checker"
+    "🔍 PDF Analyzer"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -807,205 +807,322 @@ The appraisal profession is going through its biggest technology shift in decade
 with tab_qc:
     st.markdown("## QC Checker")
     st.caption(
-        "Upload a completed TOTAL PDF. The checker extracts adjustment rates, "
-        "comp data, and addendum text then flags internal inconsistencies."
+        "Upload a TOTAL XML export and optionally the PDF. "
+        "The checker reads all structured data directly from XML and flags internal inconsistencies."
     )
     st.divider()
 
     import re
-    import fitz  # PyMuPDF
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, date as dt_date
+
+    try:
+        import fitz
+        FITZ_AVAILABLE = True
+    except ImportError:
+        FITZ_AVAILABLE = False
 
     u1, u2 = st.columns(2)
     with u1:
-        qc_pdf = st.file_uploader(
-            "Upload TOTAL Appraisal PDF",
-            type=["pdf"],
-            key="qc_pdf_upload",
-            help="For addendum text, comp data, and adjustment rates."
+        qc_xml = st.file_uploader(
+            "Upload TOTAL XML Export (required)",
+            type=["xml"],
+            key="qc_xml_upload",
+            help="File > Export > XML from TOTAL. Contains all structured report data."
         )
     with u2:
-        qc_html = st.file_uploader(
-            "Upload TOTAL Appraisal XML (optional but recommended)",
-            type=["xml"],
-            key="qc_html_upload",
-            help="Export from TOTAL as XML (MISMO format). Provides cleaner structured data extraction."
+        qc_pdf = st.file_uploader(
+            "Upload TOTAL PDF (optional)",
+            type=["pdf"],
+            key="qc_pdf_upload",
+            help="Adds addendum narrative text checks — adjustment support language, prior sale commentary."
         )
 
-    if not qc_pdf:
-        st.info("Upload a TOTAL appraisal PDF to run QC checks. Adding the HTML export improves accuracy.")
+    if not qc_xml:
+        st.info("Upload a TOTAL XML export to run QC checks.")
         st.stop()
 
+    # ── Parse XML ─────────────────────────────────────────────────────────
+    @st.cache_data(show_spinner="Parsing XML...")
+    def parse_xml(xml_bytes):
+        root = ET.fromstring(xml_bytes.decode("utf-8", errors="ignore"))
+        return root
+
     @st.cache_data(show_spinner="Reading PDF...")
-    def read_pdf(pdf_bytes):
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        pages = [page.get_text() for page in doc]
-        return "\n".join(pages), pages
-
-    def read_html(xml_bytes):
-        """Extract plain text from TOTAL XML (MISMO) export."""
-        try:
-            import xml.etree.ElementTree as ET
-            raw = xml_bytes.decode("utf-8", errors="ignore")
-            # Strip XML tags to get plain text with values
-            import re as _re
-            # Keep tag names adjacent to values for label matching
-            # Convert <TagName>Value</TagName> to "TagName Value\n"
-            raw = _re.sub(r'<([A-Za-z][A-Za-z0-9_]+)[^>]*>([^<]{1,200})</\1>',
-                          lambda m: f"{m.group(1)} {m.group(2).strip()}\n", raw)
-            raw = _re.sub(r'<[^>]+>', ' ', raw)
-            raw = _re.sub(r'[ \t]+', ' ', raw)
-            raw = _re.sub(r'\n{3,}', '\n\n', raw)
-            return raw.strip()
-        except Exception:
+    def parse_pdf(pdf_bytes):
+        if not FITZ_AVAILABLE:
             return ""
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        return "\n".join(p.get_text() for p in doc)
 
-    pdf_bytes = qc_pdf.read()
-    full_text, pages = read_pdf(pdf_bytes)
-
-    # HTML text supplements PDF — use it where available for cleaner extraction
-    html_text = ""
-    if qc_html:
-        html_text = read_html(qc_html.read())
-        st.success("PDF + XML loaded — combined extraction active.")
+    xml_root = parse_xml(qc_xml.read())
+    pdf_text = ""
+    if qc_pdf:
+        pdf_text = parse_pdf(qc_pdf.read())
+        st.success("XML + PDF loaded.")
     else:
-        st.success("PDF loaded. Add XML export for improved accuracy.")
+        st.success("XML loaded.")
 
-    # Use HTML text when available, fall back to PDF text
-    structured_text = html_text if html_text else full_text
-    # Always use full_text for addendum (narrative) — PDF is better for that
-    narrative_text  = full_text
-
-    def extract_int(text):
-        if text is None:
-            return None
-        clean = re.sub(r'[$,+]', '', str(text).strip())
-        try:
-            return int(float(clean))
-        except Exception:
-            return None
-
-    def find_adj_rate(text, label_pattern):
-        m = re.search(label_pattern, text, re.IGNORECASE)
-        if m:
-            return extract_int(m.group(1))
+    # ── XML helpers ───────────────────────────────────────────────────────
+    def find_elem(root, tag):
+        for e in root.iter():
+            t = e.tag.split('}')[-1] if '}' in e.tag else e.tag
+            if t == tag:
+                return e
         return None
 
-    # Extract adjustment rates from addendum
-    adj_section = ""
-    for marker in ["Adjustments made:", "Adjustment rates:", "adjustments are"]:
-        idx = narrative_text.find(marker)
-        if idx != -1:
-            adj_section = narrative_text[idx:idx+600]
-            break
+    def find_all_elems(root, tag):
+        results = []
+        for e in root.iter():
+            t = e.tag.split('}')[-1] if '}' in e.tag else e.tag
+            if t == tag:
+                results.append(e)
+        return results
 
-    stated_gla_rate  = find_adj_rate(adj_section, r'\$([\d,]+)\s*per\s*SF\s*GLA')
-    stated_bed_rate  = find_adj_rate(adj_section, r'[Bb]edroom[s]?\s*adj\s*[@\$]\s*\$?([\d,]+)')
-    stated_bath_rate = find_adj_rate(adj_section, r'Full\s*[Bb]ath\s*adj\s*[@\$]\s*\$?([\d,]+)')
-    stated_gar_rate  = find_adj_rate(adj_section, r'[Gg]arage\s*adj\s*[@\$]\s*\$?([\d,]+)')
-    stated_bsmt_rate = find_adj_rate(adj_section, r'[Bb]asement\s*adj\s*[@\$]\s*\$?([\d,]+)')
+    def attr(elem, key, default=""):
+        if elem is None:
+            return default
+        return elem.get(key, default).strip()
 
-    # Subject data
-    subj_gla = None
-    size_idx = structured_text.find("Size (Square Feet)")
-    if size_idx != -1:
-        m = re.search(r'(\d[,\d]+)', structured_text[size_idx:size_idx+100])
-        if m:
-            subj_gla = extract_int(m.group(1))
+    def to_int(val):
+        if not val:
+            return None
+        try:
+            return int(float(str(val).replace("$","").replace(",","").replace("+","").strip()))
+        except Exception:
+            return None
 
-    cond_match = re.search(
-        r'(C[1-6]|Average-Above|Above Average|Average|Below Average|Good|Fair)',
-        structured_text[:5000])
-    subj_condition = cond_match.group(1) if cond_match else ""
+    def to_float(val):
+        if not val:
+            return None
+        try:
+            return float(str(val).replace("%","").replace("$","").replace(",","").strip())
+        except Exception:
+            return None
 
-    rooms_match = re.search(r'(\d)\s+Rooms\s+(\d)\s+Bedrooms\s+(\d)\s+Bath', structured_text)
-    form_rooms = int(rooms_match.group(1)) if rooms_match else None
+    def parse_date(val):
+        if not val:
+            return None
+        for fmt in ["%Y-%m-%d","%m/%d/%Y","%Y/%m/%d"]:
+            try:
+                return datetime.strptime(val.strip(), fmt).date()
+            except Exception:
+                pass
+        return None
 
-    # Comp extraction
+    # ── Extract subject data ──────────────────────────────────────────────
+    prop    = find_elem(xml_root, "PROPERTY")
+    struct  = find_elem(xml_root, "STRUCTURE")
+    site    = find_elem(xml_root, "SITE")
+    nbhd    = find_elem(xml_root, "NEIGHBORHOOD")
+    val_elem= find_elem(xml_root, "VALUATION")
+    recon   = find_elem(xml_root, "_RECONCILIATION")
+    report  = find_elem(xml_root, "REPORT")
+
+    subj_addr    = attr(prop, "_StreetAddress")
+    subj_city    = attr(prop, "_City")
+    subj_state   = attr(prop, "_State")
+    subj_rights  = attr(prop, "_RightsType")
+
+    subj_gla     = to_int(attr(struct, "GrossLivingAreaSquareFeetCount"))
+    subj_rooms   = to_int(attr(struct, "TotalRoomCount"))
+    subj_beds    = to_int(attr(struct, "TotalBedroomCount"))
+    subj_baths   = to_float(attr(struct, "TotalBathroomCount"))
+    subj_yr      = to_int(attr(struct, "PropertyStructureBuiltYear"))
+    subj_stories = to_float(attr(struct, "StoriesCount"))
+    subj_style   = attr(struct, "_DesignDescription")
+
+    subj_site    = attr(site, "_AreaDescription")
+    subj_zone    = attr(site, "_ZoningClassificationIdentifier")
+    subj_zcomp   = attr(site, "_ZoningComplianceType")
+
+    nbhd_value_trend = attr(nbhd, "_PropertyValueTrendType")
+    nbhd_supply      = attr(nbhd, "_DemandSupplyType")
+    nbhd_mkt_time    = attr(nbhd, "_TypicalMarketingTimeDurationType")
+    nbhd_growth      = attr(nbhd, "_GrowthPaceType")
+    nbhd_builtup     = attr(nbhd, "_BuiltupRangeType")
+    nbhd_desc        = attr(nbhd, "_Description")
+
+    appraised_value  = to_int(attr(val_elem, "PropertyAppraisedValueAmount"))
+    eff_date         = parse_date(attr(val_elem, "AppraisalEffectiveDate"))
+    recon_comment    = attr(recon, "_SummaryComment")
+
+    report_signed    = parse_date(attr(report, "AppraiserReportSignedDate"))
+    file_num         = attr(report, "AppraiserFileIdentifier")
+    purpose          = attr(report, "AppraisalPurposeType")
+
+    # Appraiser license
+    lic_elem  = find_elem(xml_root, "APPRAISER_LICENSE")
+    lic_num   = attr(lic_elem, "_Identifier")
+    lic_exp   = parse_date(attr(lic_elem, "_ExpirationDate"))
+    lic_state = attr(lic_elem, "_State")
+
+    appraiser_elem = find_elem(xml_root, "APPRAISER")
+    appraiser_name = attr(appraiser_elem, "_Name")
+
+    insp_elem = find_elem(xml_root, "INSPECTION")
+    insp_date = parse_date(attr(insp_elem, "InspectionDate"))
+
+    supervisor_elem = find_elem(xml_root, "SUPERVISOR")
+    supervisor_name = attr(supervisor_elem, "_Name")
+
+    # Borrower / intended user
+    borrower_elem = find_elem(xml_root, "BORROWER")
+    borrower_name = attr(borrower_elem, "_UnparsedName")
+
+    lender_elem = find_elem(xml_root, "LENDER")
+    lender_name = attr(lender_elem, "_UnparsedName")
+
+    # ── Extract comparable sales ──────────────────────────────────────────
+    comp_elems = find_all_elems(xml_root, "COMPARABLE_SALE")
+    # First comp (seq 0) is the subject — skip it
+    actual_comps = [c for c in comp_elems
+                    if attr(c,"PropertySequenceIdentifier") != "0"]
+
     comps = []
-    comp_sections = re.split(r'COMPARABLE SALE #?\s*\d', structured_text)
-    for i, block in enumerate(comp_sections[1:6], 1):
-        addr_m  = re.search(r'(\d+\s+[A-Za-z][^\n]+(?:Ave|St|Dr|Rd|Ln|Blvd|Way|Ct)[^\n]*)', block)
-        price_m = re.search(r'\n([\d,]{5,})\n', block[:200])
-        gla_m   = re.search(r'\n(\d{3,4})\n([+\-][\d,]+)\n', block)
-        cond_m  = re.search(
-            r'(C[1-6]|Average-Above|Above Average|Average|Below Average)\n([+\-][\d,]+|0)\n',
-            block)
-        net_matches = re.findall(r'([+\-][\d,]+)\n([\d,]+)\n', block[-300:])
+    for c in actual_comps:
+        seq      = to_int(attr(c, "PropertySequenceIdentifier"))
+        price    = to_int(attr(c, "PropertySalesAmount"))
+        net_pct  = to_float(attr(c, "SalePriceTotalAdjustmentNetPercent"))
+        gross_pct= to_float(attr(c, "SalesPriceTotalAdjustmentGrossPercent"))
+        net_amt  = to_int(attr(c, "SalePriceTotalAdjustmentAmount"))
+        adj_val  = to_int(attr(c, "AdjustedSalesPriceAmount"))
+        net_pos  = attr(c, "SalesPriceTotalAdjustmentPositiveIndicator")  # Y/N
+
+        # Location
+        loc = find_elem(c, "LOCATION")
+        comp_addr   = attr(loc, "PropertyStreetAddress")
+        comp_city   = attr(loc, "PropertyCity")
+        proximity   = attr(loc, "ProximityToSubjectDescription")
+
+        # Extract miles from proximity
+        prox_miles  = None
+        pm = re.search(r'([\d.]+)\s*miles?', proximity or "", re.IGNORECASE)
+        if pm:
+            prox_miles = float(pm.group(1))
+
+        # Room data
+        room_adj = find_elem(c, "ROOM_ADJUSTMENT")
+        comp_rooms= to_int(attr(room_adj, "TotalRoomCount"))
+        comp_beds = to_int(attr(room_adj, "TotalBedroomCount"))
+        comp_baths= to_float(attr(room_adj, "TotalBathroomCount"))
+
+        # Sale price adjustments — build dict by type
+        adj_map = {}
+        for spa in find_all_elems(c, "SALE_PRICE_ADJUSTMENT"):
+            atype = attr(spa, "_Type")
+            adesc = attr(spa, "_Description")
+            aamt  = attr(spa, "_Amount")
+            adj_map[atype] = {"desc": adesc, "amount": to_int(aamt) if aamt else None}
+
+        # Other feature adjustments
+        other_adjs = []
+        for ofa in find_all_elems(c, "OTHER_FEATURE_ADJUSTMENT"):
+            desc = attr(ofa, "PropertyFeatureDescription")
+            amt  = to_int(attr(ofa, "PropertyFeatureAdjustmentAmount"))
+            if desc or amt:
+                other_adjs.append({"desc": desc, "amount": amt})
+
+        # Prior sale
+        prior = find_elem(c, "PRIOR_SALES")
+        prior_date = attr(prior, "PropertySalesDate")
+        prior_amt  = to_int(attr(prior, "PropertySalesAmount"))
+
+        # Parse comp GLA from GrossLivingArea adjustment description
+        comp_gla = None
+        if "GrossLivingArea" in adj_map:
+            gla_desc = adj_map["GrossLivingArea"]["desc"]
+            gm = re.match(r'(\d+)', gla_desc or "")
+            if gm:
+                comp_gla = to_int(gm.group(1))
+
+        # Parse date of sale
+        sale_date_str = adj_map.get("DateOfSale",{}).get("desc","")
+        # Format: s08/25;c06/25 — settled date first
+        sale_date = None
+        sdm = re.search(r's(\d{2}/\d{2})', sale_date_str or "")
+        if sdm:
+            # Convert MM/YY to approximate date
+            parts = sdm.group(1).split("/")
+            try:
+                sale_date = dt_date(2000 + int(parts[1]), int(parts[0]), 1)
+            except Exception:
+                pass
+
+        # Parse financing concessions amount
+        fin_desc = adj_map.get("FinancingConcessions",{}).get("desc","")
+        fin_amt = None
+        fm = re.search(r';(\d+)', fin_desc or "")
+        if fm:
+            fin_amt = to_int(fm.group(1))
 
         comps.append({
-            "num":       i,
-            "address":   addr_m.group(1).strip() if addr_m else f"Comp #{i}",
-            "price":     extract_int(price_m.group(1)) if price_m else None,
-            "gla":       extract_int(gla_m.group(1)) if gla_m else None,
-            "gla_adj":   extract_int(gla_m.group(2)) if gla_m else None,
-            "condition": cond_m.group(1) if cond_m else "",
-            "cond_adj":  extract_int(cond_m.group(2)) if cond_m else None,
-            "net_adj":   extract_int(net_matches[-1][0]) if net_matches else None,
-            "adj_value": extract_int(net_matches[-1][1]) if net_matches else None,
+            "num": seq, "address": comp_addr, "city": comp_city,
+            "proximity": proximity, "prox_miles": prox_miles,
+            "price": price, "net_pct": net_pct, "gross_pct": gross_pct,
+            "net_amt": net_amt, "net_pos": net_pos, "adj_value": adj_val,
+            "rooms": comp_rooms, "beds": comp_beds, "baths": comp_baths,
+            "gla": comp_gla, "adj_map": adj_map, "other_adjs": other_adjs,
+            "prior_date": prior_date, "prior_amt": prior_amt,
+            "sale_date": sale_date, "fin_amt": fin_amt,
         })
 
-    # Display extracted data
+    # ── Display extracted summary ─────────────────────────────────────────
     with st.expander("Extracted Data — expand to review", expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Stated Adjustment Rates**")
-            st.write(f"GLA: ${stated_gla_rate:,}/sf" if stated_gla_rate else "GLA rate: not found")
-            st.write(f"Bedroom: ${stated_bed_rate:,}" if stated_bed_rate else "Bedroom rate: not found")
-            st.write(f"Full Bath: ${stated_bath_rate:,}" if stated_bath_rate else "Bath rate: not found")
-            st.write(f"Garage: ${stated_gar_rate:,}/stall" if stated_gar_rate else "Garage rate: not found")
-            st.write(f"Basement: ${stated_bsmt_rate:,}" if stated_bsmt_rate else "Basement rate: not found")
-        with col2:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             st.markdown("**Subject**")
+            st.write(f"Address: {subj_addr}, {subj_city}, {subj_state}")
             st.write(f"GLA: {subj_gla:,} sf" if subj_gla else "GLA: not found")
-            st.write(f"Condition: {subj_condition}" if subj_condition else "Condition: not found")
-            st.write(f"Rooms: {form_rooms}" if form_rooms else "Room count: not found")
+            st.write(f"Rooms: {subj_rooms} | Beds: {subj_beds} | Baths: {subj_baths}")
+            st.write(f"Year Built: {subj_yr}")
+            st.write(f"Style: {subj_style}")
+            st.write(f"Property Rights: {subj_rights}")
+            st.write(f"Appraised Value: ${appraised_value:,}" if appraised_value else "Value: not found")
+            st.write(f"Effective Date: {eff_date}")
+        with c2:
+            st.markdown("**Appraiser / License**")
+            st.write(f"Name: {appraiser_name}")
+            st.write(f"License: {lic_num} ({lic_state})")
+            st.write(f"License Exp: {lic_exp}")
+            st.write(f"Inspection Date: {insp_date}")
+            st.write(f"Report Signed: {report_signed or 'not found'}")
+            st.write(f"Supervisor: {supervisor_name or '(none)'}")
+            st.write(f"File #: {file_num or '(blank)'}")
+        with c3:
+            st.markdown("**Market / Neighborhood**")
+            st.write(f"Value Trend: {nbhd_value_trend}")
+            st.write(f"Supply/Demand: {nbhd_supply}")
+            st.write(f"Marketing Time: {nbhd_mkt_time}")
+            st.write(f"Growth Rate: {nbhd_growth}")
+            st.write(f"Built-Up: {nbhd_builtup}")
+
         if comps:
-            st.markdown("**Comps Found**")
+            st.markdown("**Comparable Sales**")
             for c in comps:
-                p = f"${c['price']:,}" if c['price'] else "—"
-                g = f"{c['gla']:,} sf" if c['gla'] else "—"
-                st.write(f"Comp #{c['num']}: {c['address'][:35]} | {p} | GLA {g} | {c['condition']}")
+                p   = f"${c['price']:,}" if c['price'] else "—"
+                av  = f"${c['adj_value']:,}" if c['adj_value'] else "—"
+                np  = f"{c['net_pct']}%" if c['net_pct'] is not None else "—"
+                gp  = f"{c['gross_pct']}%" if c['gross_pct'] is not None else "—"
+                gla = f"{c['gla']:,} sf" if c['gla'] else "—"
+                st.write(f"Comp #{c['num']}: {c['address']} | {p} → {av} "
+                          f"| Net {np} | Gross {gp} | GLA {gla} | {c['proximity']}")
 
-    # Manual inputs
+    # ── Sketch input (still manual — images not parseable) ────────────────
     st.divider()
-    st.markdown("### Manual Inputs")
-    st.caption("Sketch rooms can't be extracted from image-based sketch pages — enter manually.")
+    st.markdown("### Sketch Input")
+    st.caption("Sketch room count and GLA can't be extracted from image-based sketch pages.")
+    sk1, sk2 = st.columns(2)
+    with sk1:
+        sketch_rooms = st.number_input("Sketch room count (above grade)",
+                                        min_value=0, max_value=20,
+                                        value=subj_rooms or 0, key="qc_sketch_rooms")
+    with sk2:
+        sketch_gla   = st.number_input("Sketch GLA (sq ft)",
+                                        min_value=0, max_value=10000,
+                                        value=subj_gla or 0, key="qc_sketch_gla")
 
-    mi1, mi2 = st.columns(2)
-    with mi1:
-        sketch_rooms  = st.number_input("Sketch room count (above grade)",
-                                         min_value=0, max_value=20,
-                                         value=form_rooms or 0, key="qc_sketch_rooms")
-        sketch_gla    = st.number_input("Sketch GLA (sq ft)",
-                                         min_value=0, max_value=10000,
-                                         value=subj_gla or 0, key="qc_sketch_gla")
-    with mi2:
-        form_rooms_in = st.number_input("Form stated room count",
-                                         min_value=0, max_value=20,
-                                         value=form_rooms or 0, key="qc_form_rooms")
-        form_gla_in   = st.number_input("Form stated GLA (sq ft)",
-                                         min_value=0, max_value=10000,
-                                         value=subj_gla or 0, key="qc_form_gla")
-
-    with st.expander("Override extracted adjustment rates"):
-        or1, or2, or3 = st.columns(3)
-        with or1:
-            gla_rate  = st.number_input("GLA rate ($/sf)",
-                                         value=float(stated_gla_rate or 35), key="qc_gla_rate")
-            bed_rate  = st.number_input("Bedroom rate ($)",
-                                         value=float(stated_bed_rate or 5000), key="qc_bed_rate")
-        with or2:
-            bath_rate = st.number_input("Full Bath rate ($)",
-                                         value=float(stated_bath_rate or 3000), key="qc_bath_rate")
-            gar_rate  = st.number_input("Garage rate ($/stall)",
-                                         value=float(stated_gar_rate or 10000), key="qc_gar_rate")
-        with or3:
-            bsmt_rate     = st.number_input("Basement rate ($)",
-                                              value=float(stated_bsmt_rate or 10000), key="qc_bsmt_rate")
-            gla_threshold = st.number_input("GLA threshold (sf, adj only above this)",
-                                              value=50.0, key="qc_gla_thresh")
-
-    # Run checks
+    # ── Run QC ────────────────────────────────────────────────────────────
     st.divider()
     if st.button("Run QC Checks", type="primary", use_container_width=True, key="qc_run"):
 
@@ -1014,138 +1131,312 @@ with tab_qc:
 
         def flag(cat, msg, sev="warning"):
             flags.append({"cat": cat, "msg": msg, "sev": sev})
-
         def ok(cat, msg):
             passes.append({"cat": cat, "msg": msg})
 
-        # 1 — Room count vs sketch
-        if form_rooms_in > 0 and sketch_rooms > 0:
-            if form_rooms_in != sketch_rooms:
+        # ── 1. License expiration vs effective date ───────────────────────
+        if lic_exp and eff_date:
+            if lic_exp < eff_date:
+                flag("License Expired",
+                     f"License expired {lic_exp} but effective date is {eff_date}.",
+                     "critical")
+            else:
+                ok("License",
+                   f"License {lic_num} valid through {lic_exp} — effective date {eff_date}.")
+        elif not lic_exp:
+            flag("License", "License expiration date not found in XML.", "critical")
+
+        # ── 2. License state matches property state ───────────────────────
+        if lic_state and subj_state:
+            if lic_state.upper() != subj_state.upper():
+                flag("License State",
+                     f"License is for {lic_state} but property is in {subj_state}.",
+                     "critical")
+            else:
+                ok("License State",
+                   f"License state ({lic_state}) matches property state ({subj_state}).")
+
+        # ── 3. Inspection date not after effective date ───────────────────
+        if insp_date and eff_date:
+            if insp_date > eff_date:
+                flag("Inspection Date",
+                     f"Inspection date {insp_date} is after effective date {eff_date}.",
+                     "critical")
+            else:
+                ok("Inspection Date",
+                   f"Inspection date {insp_date} is on or before effective date {eff_date}.")
+
+        # ── 4. File number blank ──────────────────────────────────────────
+        if not file_num:
+            flag("File Number", "File number is blank.", "warning")
+        else:
+            ok("File Number", f"File number present: {file_num}")
+
+        # ── 5. Room count — form vs sketch ────────────────────────────────
+        if subj_rooms and sketch_rooms > 0:
+            if subj_rooms != sketch_rooms:
                 flag("Room Count",
-                     f"Form states {form_rooms_in} rooms above grade but "
-                     f"sketch shows {sketch_rooms} rooms.", "critical")
+                     f"Form states {subj_rooms} rooms but sketch shows {sketch_rooms}.",
+                     "critical")
             else:
-                ok("Room Count", f"Form and sketch agree: {form_rooms_in} rooms.")
+                ok("Room Count", f"Form and sketch agree: {subj_rooms} rooms.")
 
-        # 2 — GLA form vs sketch
-        if form_gla_in > 0 and sketch_gla > 0:
-            diff = abs(form_gla_in - sketch_gla)
-            pct  = diff / form_gla_in * 100
+        # ── 6. GLA — form vs sketch ───────────────────────────────────────
+        if subj_gla and sketch_gla > 0:
+            diff = abs(subj_gla - sketch_gla)
+            pct  = diff / subj_gla * 100
             if diff > 20:
-                sev = "critical" if pct > 5 else "warning"
                 flag("GLA Discrepancy",
-                     f"Form GLA {form_gla_in:,} sf vs sketch GLA {sketch_gla:,} sf "
-                     f"— difference of {diff} sf ({pct:.1f}%).", sev)
+                     f"Form GLA {subj_gla:,} sf vs sketch GLA {sketch_gla:,} sf "
+                     f"— difference of {diff} sf ({pct:.1f}%).",
+                     "critical" if pct > 5 else "warning")
             else:
-                ok("GLA", "Form and sketch GLA agree within 20 sf.")
+                ok("GLA", f"Form and sketch GLA agree within 20 sf ({subj_gla:,} sf).")
 
-        # 3 — GLA adjustment rate consistency
-        if subj_gla and gla_rate and comps:
-            gla_issues = []
+        # ── 7. Net adjustment per comp > 15% ─────────────────────────────
+        net_issues = []
+        for c in comps:
+            if c["net_pct"] is not None and abs(c["net_pct"]) > 15:
+                net_issues.append(
+                    f"Comp #{c['num']} ({c['address'][:25]}): "
+                    f"net adj {c['net_pct']:+.1f}% exceeds 15% guideline")
+        if net_issues:
+            for iss in net_issues:
+                flag("Net Adjustment >15%", iss)
+        else:
+            ok("Net Adjustments", "All comp net adjustments within 15% guideline.")
+
+        # ── 8. Gross adjustment per comp > 25% ───────────────────────────
+        gross_issues = []
+        for c in comps:
+            if c["gross_pct"] is not None and c["gross_pct"] > 25:
+                gross_issues.append(
+                    f"Comp #{c['num']} ({c['address'][:25]}): "
+                    f"gross adj {c['gross_pct']:.1f}% exceeds 25% guideline")
+        if gross_issues:
+            for iss in gross_issues:
+                flag("Gross Adjustment >25%", iss)
+        else:
+            ok("Gross Adjustments", "All comp gross adjustments within 25% guideline.")
+
+        # ── 9. All comps adjusted same direction ─────────────────────────
+        net_directions = [c["net_pos"] for c in comps
+                          if c["net_pos"] and c["net_pct"] and abs(c["net_pct"]) > 0.5]
+        if len(net_directions) >= 3:
+            if all(d == "Y" for d in net_directions):
+                flag("Adjustment Direction",
+                     "All comps have net positive adjustments — subject may be "
+                     "priced below comparable sales without adequate explanation.")
+            elif all(d == "N" for d in net_directions):
+                flag("Adjustment Direction",
+                     "All comps have net negative adjustments — subject may be "
+                     "priced above comparable sales without adequate explanation.")
+            else:
+                ok("Adjustment Direction",
+                   "Comps have mixed net adjustment directions — no bracketing concern.")
+
+        # ── 10. Subject value vs adjusted comp range ──────────────────────
+        adj_values = [c["adj_value"] for c in comps if c["adj_value"]]
+        if adj_values and appraised_value:
+            low_adj  = min(adj_values)
+            high_adj = max(adj_values)
+            if appraised_value < low_adj:
+                flag("Value Outside Comp Range",
+                     f"Appraised value ${appraised_value:,} is below lowest adjusted "
+                     f"comp value ${low_adj:,}.")
+            elif appraised_value > high_adj:
+                flag("Value Outside Comp Range",
+                     f"Appraised value ${appraised_value:,} is above highest adjusted "
+                     f"comp value ${high_adj:,}.")
+            else:
+                ok("Value Within Range",
+                   f"Appraised value ${appraised_value:,} is within adjusted "
+                   f"comp range ${low_adj:,}–${high_adj:,}.")
+
+        # ── 11. GLA bracketing ────────────────────────────────────────────
+        comp_glas = [c["gla"] for c in comps if c["gla"]]
+        if comp_glas and subj_gla:
+            low_gla  = min(comp_glas)
+            high_gla = max(comp_glas)
+            if subj_gla < low_gla:
+                flag("GLA Bracketing",
+                     f"Subject GLA {subj_gla:,} sf is below all comp GLAs "
+                     f"(range: {low_gla:,}–{high_gla:,} sf). Consider adding a smaller comp.")
+            elif subj_gla > high_gla:
+                flag("GLA Bracketing",
+                     f"Subject GLA {subj_gla:,} sf is above all comp GLAs "
+                     f"(range: {low_gla:,}–{high_gla:,} sf). Consider adding a larger comp.")
+            else:
+                ok("GLA Bracketing",
+                   f"Subject GLA {subj_gla:,} sf is bracketed by comps "
+                   f"({low_gla:,}–{high_gla:,} sf).")
+
+        # ── 12. GLA adjustment rate consistency ───────────────────────────
+        if subj_gla and comps:
+            implied_rates = []
             for c in comps:
-                if c["gla"] and c["gla_adj"] is not None and c["gla_adj"] != 0:
+                if c["gla"] and c["adj_map"].get("GrossLivingArea",{}).get("amount") is not None:
                     diff = subj_gla - c["gla"]
-                    adj_diff = diff - gla_threshold if diff > 0 else diff + gla_threshold if diff < 0 else 0
-                    expected = int(adj_diff * gla_rate)
-                    actual   = c["gla_adj"]
-                    variance = abs(actual - expected)
-                    if variance > 500:
-                        gla_issues.append(
-                            f"Comp #{c['num']} ({c['address'][:25]}): "
-                            f"GLA diff {diff:+,} sf → expected ~${expected:,} "
-                            f"but report shows ${actual:,} (off by ${variance:,})"
-                        )
-            if gla_issues:
-                for iss in gla_issues:
-                    flag("GLA Adj Rate", iss)
-            else:
-                ok("GLA Adj Rate",
-                   f"GLA adjustments consistent with stated ${int(gla_rate)}/sf rate.")
+                    adj  = c["adj_map"]["GrossLivingArea"]["amount"]
+                    if adj and diff and abs(diff) > 30:
+                        rate = round(abs(adj / diff))
+                        implied_rates.append((c["num"], c["address"][:25], diff, adj, rate))
 
-        # 4 — Condition adjustment consistency
-        if comps:
-            cond_map = {}
+            if len(implied_rates) >= 2:
+                rates = [r[4] for r in implied_rates]
+                rate_range = max(rates) - min(rates)
+                if rate_range > 5:
+                    detail = ", ".join([f"Comp #{n}: ${r}/sf" for n,_,_,_,r in implied_rates])
+                    flag("GLA Adj Rate Inconsistency",
+                         f"Implied GLA adjustment rates vary: {detail}. "
+                         f"Verify consistent rate is applied.")
+                else:
+                    ok("GLA Adj Rate",
+                       f"GLA adj rate consistent across comps (~${rates[0]}/sf).")
+
+        # ── 13. Condition adjustment consistency ──────────────────────────
+        cond_adj_map = {}
+        for c in comps:
+            cond = c["adj_map"].get("Condition",{}).get("desc","")
+            amt  = c["adj_map"].get("Condition",{}).get("amount")
+            if cond and amt is not None:
+                cond_adj_map.setdefault(cond,[]).append((c["num"], amt))
+
+        cond_issues = []
+        for cond, entries in cond_adj_map.items():
+            amts = set(e[1] for e in entries)
+            if len(amts) > 1:
+                detail = ", ".join([f"Comp #{n}: ${a:,}" for n,a in entries])
+                cond_issues.append(
+                    f"Comps rated '{cond}' have different adjustments: {detail}")
+        if cond_issues:
+            for iss in cond_issues:
+                flag("Condition Adj Consistency", iss)
+        elif cond_adj_map:
+            ok("Condition Adjustments",
+               "Condition adjustments consistent for comps with matching ratings.")
+
+        # ── 14. Comp proximity flags ──────────────────────────────────────
+        far_comps = [c for c in comps
+                     if c["prox_miles"] and c["prox_miles"] > 1.0]
+        if far_comps:
+            for c in far_comps:
+                flag("Comp Distance",
+                     f"Comp #{c['num']} ({c['address'][:25]}) is {c['prox_miles']:.2f} miles "
+                     f"from subject. Verify extended search explanation is in addendum.")
+        else:
+            ok("Comp Distance", "All comps within 1 mile of subject.")
+
+        # ── 15. Comp date — older than 12 months ─────────────────────────
+        if eff_date:
+            old_comps = []
             for c in comps:
-                if c["condition"] and c["cond_adj"] is not None:
-                    cond_map.setdefault(c["condition"], []).append((c["num"], c["cond_adj"]))
-            issues = []
-            for cond, entries in cond_map.items():
-                adjs = set(e[1] for e in entries)
-                if len(adjs) > 1:
-                    detail = ", ".join([f"Comp #{n}: ${a:,}" for n,a in entries])
-                    issues.append(
-                        f"Comps rated '{cond}' have different adjustments: {detail}"
-                    )
-            if issues:
-                for iss in issues:
-                    flag("Condition Adj Consistency", iss)
-            elif cond_map:
-                ok("Condition Adj Consistency",
-                   "Condition adjustments consistent for comps with matching ratings.")
-
-        # 5 — Condition rating vs narrative language
-        if subj_condition:
-            addendum_lower = narrative_text.lower()
-            cond_conflicts = {
-                "deferred maintenance": ["C4","C5","C6","Average","Below Average","Fair"],
-                "needs repair": ["C5","C6","Below Average"],
-                "significant deterioration": ["C5","C6"],
-            }
-            for phrase, expected in cond_conflicts.items():
-                if phrase in addendum_lower:
-                    if not any(e.lower() in subj_condition.lower() for e in expected):
-                        flag("Condition vs Narrative",
-                             f"Addendum mentions '{phrase}' but condition "
-                             f"rated '{subj_condition}'.")
-            ok("Condition vs Narrative",
-               "No major conflicts between condition rating and narrative.")
-
-        # 6 — Prior sale addressed
-        prior_phrases = ["No other prior sales", "no prior sales", "prior sale",
-                          "prior transfer", "1st Prior Subject", "did not reveal"]
-        if any(p in narrative_text for p in prior_phrases):
-            ok("Prior Sale", "Prior sale / transfer history addressed.")
-        else:
-            flag("Prior Sale",
-                 "No prior sale or transfer history language found. "
-                 "Verify transfer history section is complete.")
-
-        # 7 — Market conditions narrative consistency
-        mkt_idx = structured_text.find("Market Area Boundaries")
-        if mkt_idx != -1:
-            mkt_chunk = structured_text[mkt_idx:mkt_idx+300].lower()
-            if "shortage" in mkt_chunk and "over 6" in narrative_text.lower():
-                flag("Market Conditions",
-                     "Supply/demand shows 'Shortage' but marketing time may indicate 'Over 6 Months'.")
-            elif "over supply" in mkt_chunk and "under 3" in narrative_text.lower():
-                flag("Market Conditions",
-                     "Supply/demand shows 'Over Supply' but marketing time may indicate 'Under 3 Months'.")
+                if c["sale_date"]:
+                    months_old = (eff_date.year - c["sale_date"].year)*12 + \
+                                  (eff_date.month - c["sale_date"].month)
+                    if months_old > 12:
+                        old_comps.append((c["num"], c["address"][:25], months_old))
+            if old_comps:
+                for n, addr, mo in old_comps:
+                    flag("Comp Date Range",
+                         f"Comp #{n} ({addr}) is approximately {mo} months old. "
+                         f"Verify extended search explanation is in addendum.")
             else:
-                ok("Market Conditions", "Market conditions checkboxes appear internally consistent.")
+                ok("Comp Dates", "All comps appear within 12 months of effective date.")
 
-        # 8 — Adjustment support language in addendum
-        if not adj_section:
-            flag("Adjustment Support",
-                 "No adjustment rate statement found in addendum. "
-                 "Verify adjustment support language is present.", "critical")
+        # ── 16. Concessions — disclosed but not adjusted ──────────────────
+        concession_issues = []
+        for c in comps:
+            if c["fin_amt"] and c["fin_amt"] > 0:
+                # Check if there's a corresponding adjustment amount for concessions
+                sales_con_amt = c["adj_map"].get("SalesConcessions",{}).get("amount")
+                fin_con_amt   = c["adj_map"].get("FinancingConcessions",{}).get("amount")
+                if sales_con_amt is None and fin_con_amt is None:
+                    concession_issues.append(
+                        f"Comp #{c['num']} ({c['address'][:25]}) shows concessions "
+                        f"of ${c['fin_amt']:,} with no adjustment applied.")
+        if concession_issues:
+            for iss in concession_issues:
+                flag("Concessions", iss)
         else:
-            ok("Adjustment Support", "Adjustment rate statement present in addendum.")
+            ok("Concessions", "No unadjusted concession issues detected.")
 
-        # 9 — Comp date range
-        dates_in_report = re.findall(r'\d{2}/\d{2}/(\d{4})', structured_text)
-        years = sorted(set(int(y) for y in dates_in_report if 2000 < int(y) < 2030))
-        if years:
-            span = max(years) - min(years)
-            if span > 2:
-                flag("Comp Date Range",
-                     f"Report contains dates spanning {span} years. "
-                     f"Verify extended search explanation is in addendum.")
+        # ── 17. Prior sale flip check ─────────────────────────────────────
+        flip_issues = []
+        for c in comps:
+            if c["prior_date"] and c["prior_amt"] and c["price"]:
+                try:
+                    prior_dt = datetime.strptime(c["prior_date"], "%m/%d/%Y").date()
+                    if c["sale_date"]:
+                        months_between = (c["sale_date"].year - prior_dt.year)*12 + \
+                                          (c["sale_date"].month - prior_dt.month)
+                        pct_change = (c["price"] - c["prior_amt"]) / c["prior_amt"] * 100
+                        if months_between <= 24 and pct_change > 20:
+                            flip_issues.append(
+                                f"Comp #{c['num']} ({c['address'][:25]}) sold for "
+                                f"${c['prior_amt']:,} {months_between} months prior then "
+                                f"${c['price']:,} — {pct_change:.0f}% increase. "
+                                f"Verify arm's length transaction.")
+                except Exception:
+                    pass
+        if flip_issues:
+            for iss in flip_issues:
+                flag("Prior Sale Flip", iss)
+        elif any(c["prior_date"] for c in comps):
+            ok("Prior Sales", "No flip/rapid appreciation issues detected in comp prior sales.")
+
+        # ── 18. Market conditions consistency ────────────────────────────
+        if nbhd_supply and nbhd_mkt_time:
+            supply_lower = nbhd_supply.lower()
+            mkt_lower    = nbhd_mkt_time.lower()
+            if "shortage" in supply_lower and "overthree" in mkt_lower.replace(" ",""):
+                flag("Market Consistency",
+                     f"Supply/Demand is '{nbhd_supply}' but marketing time is "
+                     f"'{nbhd_mkt_time}' — these are inconsistent.")
+            elif "oversupply" in supply_lower.replace(" ","") and "underthree" in mkt_lower.replace(" ",""):
+                flag("Market Consistency",
+                     f"Supply/Demand is '{nbhd_supply}' but marketing time is "
+                     f"'{nbhd_mkt_time}' — these are inconsistent.")
             else:
-                ok("Comp Date Range", "Comp dates appear within acceptable range.")
+                ok("Market Consistency",
+                   f"Supply/Demand ({nbhd_supply}) and marketing time ({nbhd_mkt_time}) appear consistent.")
 
-        # ── Results display ───────────────────────────────────────────────
+        # ── 19. Supervisor blank when trainee signs ───────────────────────
+        if not supervisor_name:
+            ok("Supervisor", "No supervisory appraiser — solo assignment.")
+        else:
+            ok("Supervisor", f"Supervisory appraiser present: {supervisor_name}")
+
+        # ── 20. Addendum checks (PDF only) ────────────────────────────────
+        if pdf_text:
+            adj_support = any(m in pdf_text for m in
+                               ["Adjustments made:", "adj @", "adj@", "per SF GLA"])
+            if not adj_support:
+                flag("Adjustment Support",
+                     "No adjustment rate statement found in addendum. "
+                     "Verify adjustment support language is present.")
+            else:
+                ok("Adjustment Support",
+                   "Adjustment rate statement present in addendum.")
+
+            prior_language = any(p in pdf_text for p in
+                                  ["No other prior sales", "no prior sales",
+                                   "prior sale", "did not reveal"])
+            if not prior_language:
+                flag("Prior Sale Language",
+                     "No prior sale/transfer history language found in addendum.")
+            else:
+                ok("Prior Sale Language",
+                   "Prior sale/transfer history addressed in addendum.")
+
+            if subj_state and lic_state and subj_state.upper() != lic_state.upper():
+                pass  # Already flagged above
+        else:
+            st.caption("Upload PDF to enable addendum text checks.")
+
+        # ── Display results ───────────────────────────────────────────────
         st.markdown("---")
-        st.markdown("## QC Results")
+        st.markdown(f"## QC Results — {subj_addr}, {subj_city} {subj_state}")
 
         critical_flags = [f for f in flags if f["sev"] == "critical"]
         warning_flags  = [f for f in flags if f["sev"] == "warning"]
@@ -1180,7 +1471,3 @@ with tab_qc:
             st.markdown("### ✅ Passed")
             for p in passes:
                 st.success(f"**{p['cat']}:** {p['msg']}")
-
-        if adj_section:
-            with st.expander("Addendum adjustment text (as extracted)"):
-                st.text(adj_section[:500])
