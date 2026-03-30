@@ -825,10 +825,10 @@ with tab_qc:
         )
     with u2:
         qc_html = st.file_uploader(
-            "Upload TOTAL Appraisal HTML (optional but recommended)",
-            type=["html","htm"],
+            "Upload TOTAL Appraisal XML (optional but recommended)",
+            type=["xml"],
             key="qc_html_upload",
-            help="Export from TOTAL as HTML. Provides cleaner structured data extraction."
+            help="Export from TOTAL as XML (MISMO format). Provides cleaner structured data extraction."
         )
 
     if not qc_pdf:
@@ -841,18 +841,18 @@ with tab_qc:
         pages = [page.get_text() for page in doc]
         return "\n".join(pages), pages
 
-    def read_html(html_bytes):
-        """Extract plain text from TOTAL HTML export."""
+    def read_html(xml_bytes):
+        """Extract plain text from TOTAL XML (MISMO) export."""
         try:
-            raw = html_bytes.decode("utf-8", errors="ignore")
-            # Strip HTML tags but preserve whitespace structure
+            import xml.etree.ElementTree as ET
+            raw = xml_bytes.decode("utf-8", errors="ignore")
+            # Strip XML tags to get plain text with values
             import re as _re
-            # Replace table cells/rows with spaces/newlines for structure
-            raw = _re.sub(r'<td[^>]*>', ' ', raw, flags=_re.IGNORECASE)
-            raw = _re.sub(r'</tr>', '\n', raw, flags=_re.IGNORECASE)
-            raw = _re.sub(r'<br\s*/?>', '\n', raw, flags=_re.IGNORECASE)
-            raw = _re.sub(r'<[^>]+>', '', raw)
-            # Collapse whitespace
+            # Keep tag names adjacent to values for label matching
+            # Convert <TagName>Value</TagName> to "TagName Value\n"
+            raw = _re.sub(r'<([A-Za-z][A-Za-z0-9_]+)[^>]*>([^<]{1,200})</\1>',
+                          lambda m: f"{m.group(1)} {m.group(2).strip()}\n", raw)
+            raw = _re.sub(r'<[^>]+>', ' ', raw)
             raw = _re.sub(r'[ \t]+', ' ', raw)
             raw = _re.sub(r'\n{3,}', '\n\n', raw)
             return raw.strip()
@@ -866,9 +866,9 @@ with tab_qc:
     html_text = ""
     if qc_html:
         html_text = read_html(qc_html.read())
-        st.success(f"PDF + HTML loaded — combined extraction active.")
+        st.success("PDF + XML loaded — combined extraction active.")
     else:
-        st.success(f"PDF loaded. Add HTML export for improved accuracy.")
+        st.success("PDF loaded. Add XML export for improved accuracy.")
 
     # Use HTML text when available, fall back to PDF text
     structured_text = html_text if html_text else full_text
