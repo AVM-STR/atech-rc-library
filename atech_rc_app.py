@@ -151,27 +151,35 @@ st.set_page_config(
 if not check_password():
     st.stop()
 
-# ── Header ────────────────────────────────────────────────────────────────────
-if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH, width=200)
-st.title("A-Tech Appraisal Co. — Field Reference")
-st.caption("Revision responses, addendum comments, neighborhood descriptions, zoning data, and UAD 3.6 reference.")
+# ── Sidebar Navigation ────────────────────────────────────────────────────────
+with st.sidebar:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=180)
+    st.title("A-Tech R&C Library")
+    st.divider()
+    selection = st.selectbox(
+        "Select a Tool",
+        [
+            "📋 Revision Responses",
+            "📝 Appraisal Comments",
+            "🏘️ Neighborhood Descriptions",
+            "📐 Zoning Districts",
+            "🆕 UAD 3.6 Reference",
+            "✅ QC Checker",
+        ],
+        label_visibility="collapsed"
+    )
+    st.divider()
+    st.caption("A-Tech Appraisal Co. — Field Reference")
+
+# ── Main Header ───────────────────────────────────────────────────────────────
+st.title(selection)
 st.divider()
-
-
-tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_qc = st.tabs([
-    "📋 Revision Responses",
-    "📝 Appraisal Comments",
-    "🏘️ Neighborhood Descriptions",
-    "📐 Zoning Districts",
-    "🆕 UAD 3.6 Reference",
-    "✅ QC Checker"
-])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — REVISION RESPONSES
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_rev:
+if selection == "📋 Revision Responses":
     revisions = load_revisions()
 
     col_rs, col_ra = st.columns([4, 1])
@@ -253,7 +261,7 @@ with tab_rev:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — APPRAISAL COMMENTS
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_com:
+elif selection == "📝 Appraisal Comments":
     comments = load_comments()
 
     col_cs, col_ca = st.columns([4, 1])
@@ -327,7 +335,7 @@ with tab_com:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — NEIGHBORHOOD DESCRIPTIONS
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_hood:
+elif selection == "🏘️ Neighborhood Descriptions":
     neighborhoods = load_neighborhoods()
 
     st.subheader("🏘️ Neighborhood Descriptions")
@@ -411,7 +419,7 @@ with tab_hood:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — ZONING DISTRICTS
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_zone:
+elif selection == "📐 Zoning Districts":
     zoning = load_zoning()
 
     st.subheader("📐 Zoning Districts & Dimensional Regulations")
@@ -544,7 +552,7 @@ with tab_zone:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 5 — UAD 3.6 REFERENCE
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_uad:
+elif selection == "🆕 UAD 3.6 Reference":
     st.subheader("🆕 UAD 3.6 Reference Guide")
     st.caption("Key changes, inspection requirements, ratings definitions, and tool overview. Mandatory November 2, 2026.")
 
@@ -804,7 +812,7 @@ The appraisal profession is going through its biggest technology shift in decade
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — QC CHECKER
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_qc:
+elif selection == "✅ QC Checker":
     st.markdown("## QC Checker")
     st.caption(
         "Upload a TOTAL XML export and optionally the PDF. "
