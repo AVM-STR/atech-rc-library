@@ -815,14 +815,24 @@ with tab_qc:
     import re
     import fitz  # PyMuPDF
 
-    qc_pdf = st.file_uploader(
-        "Upload TOTAL Appraisal PDF",
-        type=["pdf"],
-        key="qc_pdf_upload"
-    )
+    u1, u2 = st.columns(2)
+    with u1:
+        qc_pdf = st.file_uploader(
+            "Upload TOTAL Appraisal PDF",
+            type=["pdf"],
+            key="qc_pdf_upload",
+            help="For addendum text, comp data, and adjustment rates."
+        )
+    with u2:
+        qc_html = st.file_uploader(
+            "Upload TOTAL Appraisal HTML (optional but recommended)",
+            type=["html","htm"],
+            key="qc_html_upload",
+            help="Export from TOTAL as HTML. Provides cleaner structured data extraction."
+        )
 
     if not qc_pdf:
-        st.info("Upload a TOTAL appraisal PDF above to run QC checks.")
+        st.info("Upload a TOTAL appraisal PDF to run QC checks. Adding the HTML export improves accuracy.")
         st.stop()
 
     @st.cache_data(show_spinner="Reading PDF...")
@@ -831,8 +841,39 @@ with tab_qc:
         pages = [page.get_text() for page in doc]
         return "\n".join(pages), pages
 
+    def read_html(html_bytes):
+        """Extract plain text from TOTAL HTML export."""
+        try:
+            raw = html_bytes.decode("utf-8", errors="ignore")
+            # Strip HTML tags but preserve whitespace structure
+            import re as _re
+            # Replace table cells/rows with spaces/newlines for structure
+            raw = _re.sub(r'<td[^>]*>', ' ', raw, flags=_re.IGNORECASE)
+            raw = _re.sub(r'</tr>', '\n', raw, flags=_re.IGNORECASE)
+            raw = _re.sub(r'<br\s*/?>', '\n', raw, flags=_re.IGNORECASE)
+            raw = _re.sub(r'<[^>]+>', '', raw)
+            # Collapse whitespace
+            raw = _re.sub(r'[ \t]+', ' ', raw)
+            raw = _re.sub(r'\n{3,}', '\n\n', raw)
+            return raw.strip()
+        except Exception:
+            return ""
+
     pdf_bytes = qc_pdf.read()
     full_text, pages = read_pdf(pdf_bytes)
+
+    # HTML text supplements PDF — use it where available for cleaner extraction
+    html_text = ""
+    if qc_html:
+        html_text = read_html(qc_html.read())
+        st.success(f"PDF + HTML loaded — combined extraction active.")
+    else:
+        st.success(f"PDF loaded. Add HTML export for improved accuracy.")
+
+    # Use HTML text when available, fall back to PDF text
+    structured_text = html_text if html_text else full_text
+    # Always use full_text for addendum (narrative) — PDF is better for that
+    narrative_text  = full_text
 
     def extract_int(text):
         if text is None:
@@ -852,9 +893,9 @@ with tab_qc:
     # Extract adjustment rates from addendum
     adj_section = ""
     for marker in ["Adjustments made:", "Adjustment rates:", "adjustments are"]:
-        idx = full_text.find(marker)
+        idx = narrative_text.find(marker)
         if idx != -1:
-            adj_section = full_text[idx:idx+600]
+            adj_section = narrative_text[idx:idx+600]
             break
 
     stated_gla_rate  = find_adj_rate(adj_section, r'\$([\d,]+)\s*per\s*SF\s*GLA')
@@ -865,23 +906,23 @@ with tab_qc:
 
     # Subject data
     subj_gla = None
-    size_idx = full_text.find("Size (Square Feet)")
+    size_idx = structured_text.find("Size (Square Feet)")
     if size_idx != -1:
-        m = re.search(r'(\d[,\d]+)', full_text[size_idx:size_idx+100])
+        m = re.search(r'(\d[,\d]+)', structured_text[size_idx:size_idx+100])
         if m:
             subj_gla = extract_int(m.group(1))
 
     cond_match = re.search(
         r'(C[1-6]|Average-Above|Above Average|Average|Below Average|Good|Fair)',
-        full_text[:5000])
+        structured_text[:5000])
     subj_condition = cond_match.group(1) if cond_match else ""
 
-    rooms_match = re.search(r'(\d)\s+Rooms\s+(\d)\s+Bedrooms\s+(\d)\s+Bath', full_text)
+    rooms_match = re.search(r'(\d)\s+Rooms\s+(\d)\s+Bedrooms\s+(\d)\s+Bath', structured_text)
     form_rooms = int(rooms_match.group(1)) if rooms_match else None
 
     # Comp extraction
     comps = []
-    comp_sections = re.split(r'COMPARABLE SALE #?\s*\d', full_text)
+    comp_sections = re.split(r'COMPARABLE SALE #?\s*\d', structured_text)
     for i, block in enumerate(comp_sections[1:6], 1):
         addr_m  = re.search(r'(\d+\s+[A-Za-z][^\n]+(?:Ave|St|Dr|Rd|Ln|Blvd|Way|Ct)[^\n]*)', block)
         price_m = re.search(r'\n([\d,]{5,})\n', block[:200])
@@ -1044,7 +1085,7 @@ with tab_qc:
 
         # 5 — Condition rating vs narrative language
         if subj_condition:
-            addendum_lower = full_text.lower()
+            addendum_lower = narrative_text.lower()
             cond_conflicts = {
                 "deferred maintenance": ["C4","C5","C6","Average","Below Average","Fair"],
                 "needs repair": ["C5","C6","Below Average"],
@@ -1062,7 +1103,7 @@ with tab_qc:
         # 6 — Prior sale addressed
         prior_phrases = ["No other prior sales", "no prior sales", "prior sale",
                           "prior transfer", "1st Prior Subject", "did not reveal"]
-        if any(p in full_text for p in prior_phrases):
+        if any(p in narrative_text for p in prior_phrases):
             ok("Prior Sale", "Prior sale / transfer history addressed.")
         else:
             flag("Prior Sale",
@@ -1070,13 +1111,13 @@ with tab_qc:
                  "Verify transfer history section is complete.")
 
         # 7 — Market conditions narrative consistency
-        mkt_idx = full_text.find("Market Area Boundaries")
+        mkt_idx = structured_text.find("Market Area Boundaries")
         if mkt_idx != -1:
-            mkt_chunk = full_text[mkt_idx:mkt_idx+300].lower()
-            if "shortage" in mkt_chunk and "over 6" in full_text.lower():
+            mkt_chunk = structured_text[mkt_idx:mkt_idx+300].lower()
+            if "shortage" in mkt_chunk and "over 6" in narrative_text.lower():
                 flag("Market Conditions",
                      "Supply/demand shows 'Shortage' but marketing time may indicate 'Over 6 Months'.")
-            elif "over supply" in mkt_chunk and "under 3" in full_text.lower():
+            elif "over supply" in mkt_chunk and "under 3" in narrative_text.lower():
                 flag("Market Conditions",
                      "Supply/demand shows 'Over Supply' but marketing time may indicate 'Under 3 Months'.")
             else:
@@ -1091,7 +1132,7 @@ with tab_qc:
             ok("Adjustment Support", "Adjustment rate statement present in addendum.")
 
         # 9 — Comp date range
-        dates_in_report = re.findall(r'\d{2}/\d{2}/(\d{4})', full_text)
+        dates_in_report = re.findall(r'\d{2}/\d{2}/(\d{4})', structured_text)
         years = sorted(set(int(y) for y in dates_in_report if 2000 < int(y) < 2030))
         if years:
             span = max(years) - min(years)
