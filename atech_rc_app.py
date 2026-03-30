@@ -159,13 +159,13 @@ st.caption("Revision responses, addendum comments, neighborhood descriptions, zo
 st.divider()
 
 
-tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_analyze = st.tabs([
+tab_rev, tab_com, tab_hood, tab_zone, tab_uad, tab_qc = st.tabs([
     "📋 Revision Responses",
     "📝 Appraisal Comments",
     "🏘️ Neighborhood Descriptions",
     "📐 Zoning Districts",
     "🆕 UAD 3.6 Reference",
-    "🔍 PDF Analyzer"
+    "✅ QC Checker"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
