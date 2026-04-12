@@ -72,7 +72,9 @@ def load_data(key, filepath, default):
     try:
         raw = st.session_state.get(key)
         if raw:
-            return json.loads(raw)
+            parsed = json.loads(raw)
+            if parsed:  # Only trust session state if it actually has data
+                return parsed
     except Exception:
         pass
     try:
