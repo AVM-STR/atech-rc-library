@@ -848,23 +848,18 @@ elif selection == "📐 Zoning Districts":
         for zone in filtered_zones:
             label = f"📐 {zone.get('city','')} — {zone.get('district','')} — {zone.get('property_type','')}"
             with st.expander(label):
-                # Display as a clean grid
-                col_a, col_b, col_c = st.columns(3)
+                # Display only the key fields
+                col_a, col_b = st.columns(2)
                 with col_a:
-                    st.metric("Min Frontage",      zone.get("frontage","—")   or "—")
-                    st.metric("Front Yard",         zone.get("front_yard","—") or "—")
-                    st.metric("Max Height",         zone.get("max_height","—") or "—")
+                    st.markdown("**Min Lot Frontage**")
+                    st.write(zone.get("frontage","—") or "—")
                 with col_b:
-                    st.metric("Min Lot Area",       zone.get("lot_area","—")   or "—")
-                    st.metric("Side Yard",          zone.get("side_yard","—")  or "—")
-                    st.metric("Max Lot Coverage",   zone.get("max_lot_cov","—")or "—")
-                with col_c:
-                    st.metric("Min Lot Width",      zone.get("lot_width","—")  or "—")
-                    st.metric("Rear Yard",          zone.get("rear_yard","—")  or "—")
-                    st.metric("Max Stories",        zone.get("max_floors","—") or "—")
+                    st.markdown("**Min Lot Area**")
+                    st.write(zone.get("lot_area","—") or "—")
 
                 if zone.get("notes"):
-                    st.caption(f"📝 Note: {zone['notes']}")
+                    st.markdown("**📝 Notes**")
+                    st.info(zone["notes"])
                 st.write("")
                 if st.button("🗑️ Delete this entry", key=f"del_zone_{zone['id']}"):
                     zoning = [z for z in zoning if z["id"] != zone["id"]]
