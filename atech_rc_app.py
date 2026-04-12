@@ -532,10 +532,9 @@ if not check_password():
 col_logo, col_title = st.columns([1, 6])
 with col_logo:
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=120)
+        st.image(LOGO_PATH, width=110)
 with col_title:
-    st.markdown("## A-Tech Appraisal Co.")
-    st.caption("Revision & Comment Library — Field Reference")
+    st.markdown("<div style='padding-top:18px'><h2 style='margin:0'>A-Tech Appraisal Co.</h2><p style='color:gray;font-size:0.85rem;margin:0'>Revision & Comment Library — Field Reference</p></div>", unsafe_allow_html=True)
 st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
@@ -802,7 +801,9 @@ with tab1:
 
     if filtered_hoods:
         for hood in filtered_hoods:
-            label = f"🏘️ {hood.get('city','')} — {hood.get('neighborhood','')}"
+            _city = hood.get('city','')
+            _hood = hood.get('neighborhood','')
+            label = f"🏘️ {_city}" if _hood == _city or _hood in ("General", _city) else f"🏘️ {_city} — {_hood}"
             with st.expander(label):
                 st.text_area(
                     "",
