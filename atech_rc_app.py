@@ -537,21 +537,21 @@ with st.sidebar:
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
 PAGES = [
-    "🏘️ Neighborhoods",
-    "📐 Zoning",
-    "📝 Comments",
-    "✅ QC Checker",
-    "📋 Revisions",
-    "🆕 UAD 3.6",
+    "Neighborhoods",
+    "Zoning",
+    "Comments",
+    "QC Checker",
+    "Revisions",
+    "UAD 3.6",
 ]
 
 PAGE_MAP = {
-    "🏘️ Neighborhoods":  "🏘️ Neighborhood Descriptions",
-    "📐 Zoning":          "📐 Zoning Districts",
-    "📝 Comments":        "📝 Appraisal Comments",
-    "✅ QC Checker":      "✅ QC Checker",
-    "📋 Revisions":       "📋 Revision Responses",
-    "🆕 UAD 3.6":         "🆕 UAD 3.6 Reference",
+    "Neighborhoods": "🏘️ Neighborhood Descriptions",
+    "Zoning":        "📐 Zoning Districts",
+    "Comments":      "📝 Appraisal Comments",
+    "QC Checker":    "✅ QC Checker",
+    "Revisions":     "📋 Revision Responses",
+    "UAD 3.6":       "🆕 UAD 3.6 Reference",
 }
 
 if "nav_selection" not in st.session_state:
