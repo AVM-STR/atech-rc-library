@@ -762,7 +762,17 @@ elif selection == "📐 Zoning Districts":
             addon = int(m.group(2).replace(',',''))
             raw   = m.group(3)
             w2n   = {"one":1,"two":2,"three":3,"four":4,"five":5}
-            above = w2n.get(raw, int(raw)) if raw and not raw.isdigit() else (int(raw) if raw else 1)
+            try:
+                if not raw:
+                    above = 1
+                elif raw.isdigit():
+                    above = int(raw)
+                elif raw in w2n:
+                    above = w2n[raw]
+                else:
+                    above = 1
+            except Exception:
+                above = 1
             return {"base_sf": base, "addon_sf": addon, "above_n": above, "type": "sf_addon"}
         # Pattern B: X acres + Y SF/unit
         m2 = re.search(r'([\d.]+)\s*acres?\s*(?:\+|plus)\s*([\d,]+)\s*(?:sf\s*)?per\s*unit', src)
@@ -858,18 +868,26 @@ elif selection == "📐 Zoning Districts":
     st.caption(f"{len(filtered_zones)} entr{'y' if len(filtered_zones)==1 else 'ies'}")
     st.divider()
 
-    # ── Display grouped by town ───────────────────────────────────────────────
+    # ── Display grouped by town — town header collapses all zones ───────────
     if filtered_zones:
-        for town, group in groupby(filtered_zones, key=lambda x: x.get("city","")):
-            st.markdown(f"### 🏙️ {town}")
-            for zone in group:
-                district = zone.get("district","")
-                frontage = zone.get("frontage","") or ""
-                lot_area = zone.get("lot_area","")  or ""
-                notes    = zone.get("notes","")     or ""
-                formula  = parse_addon_formula(lot_area, notes)
+        # Group zones by town into a dict so we can use expander per town
+        town_groups = {}
+        for zone in filtered_zones:
+            t = zone.get("city","")
+            town_groups.setdefault(t, []).append(zone)
 
-                with st.expander(f"📐  {district}"):
+        for town, zones in town_groups.items():
+            zone_count = len(zones)
+            with st.expander(f"🏙️  {town}  —  {zone_count} zone{'s' if zone_count != 1 else ''}"):
+                for zone in zones:
+                    district = zone.get("district","")
+                    frontage = zone.get("frontage","") or ""
+                    lot_area = zone.get("lot_area","")  or ""
+                    notes    = zone.get("notes","")     or ""
+                    formula  = parse_addon_formula(lot_area, notes)
+
+                    st.markdown(f"#### 📐 {district}")
+
                     # Key fields
                     col_a, col_b = st.columns(2)
                     with col_a:
@@ -881,9 +899,6 @@ elif selection == "📐 Zoning Districts":
                     if notes:
                         st.markdown(f"*📝 {notes}*")
 
-                    st.divider()
-
-                    # TOTAL formatter
                     st.markdown("**📋 Format for TOTAL**")
                     if formula:
                         unit_count = st.number_input(
@@ -906,11 +921,12 @@ elif selection == "📐 Zoning Districts":
                                  key=f"total_{zone['id']}")
                     st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
-                    st.write("")
                     if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
                         zoning = [z for z in zoning if z["id"] != zone["id"]]
                         save_zoning(zoning)
                         st.rerun()
+
+                    st.divider()
     else:
         st.info("No results. Try a different search or add a new entry.")
 
