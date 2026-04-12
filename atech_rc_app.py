@@ -900,15 +900,7 @@ elif selection == "📐 Zoning Districts":
                         st.markdown(f"*📝 {notes}*")
 
                     st.markdown("**📋 Format for TOTAL**")
-                    if formula:
-                        unit_count = st.number_input(
-                            "Number of units", min_value=1, max_value=50,
-                            value=2, step=1, key=f"units_{zone['id']}"
-                        )
-                        computed_area = compute_lot_size(formula, unit_count)
-                    else:
-                        computed_area = lot_area
-
+                    computed_area = lot_area
                     front_num = format_frontage(frontage) if frontage else ""
                     parts = []
                     if front_num:
@@ -918,7 +910,7 @@ elif selection == "📐 Zoning Districts":
                     formatted_output = " / ".join(parts) if parts else "—"
 
                     st.text_area("", value=formatted_output, height=75,
-                                 key=f"total_{zone['id']}")
+                                 key=f"total_{zone['id']}", disabled=True)
                     st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
                     if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
