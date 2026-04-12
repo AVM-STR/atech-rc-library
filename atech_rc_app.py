@@ -554,7 +554,7 @@ PAGE_MAP = {
     "UAD 3.6":       "🆕 UAD 3.6 Reference",
 }
 
-if "nav_selection" not in st.session_state:
+if "nav_selection" not in st.session_state or st.session_state["nav_selection"] not in PAGE_MAP:
     st.session_state["nav_selection"] = PAGES[0]
 
 st.markdown("""
