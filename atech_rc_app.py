@@ -522,18 +522,21 @@ def check_password():
 st.set_page_config(
     page_title="A-Tech R&C Library",
     page_icon="📚",
-    layout="centered"
+    layout="wide"
 )
 
 if not check_password():
     st.stop()
 
-# ── Sidebar Navigation ────────────────────────────────────────────────────────
-with st.sidebar:
+# ── Header ───────────────────────────────────────────────────────────────────
+col_logo, col_title = st.columns([1, 6])
+with col_logo:
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=180)
-    st.divider()
-    st.caption("A-Tech Appraisal Co. — Field Reference")
+        st.image(LOGO_PATH, width=120)
+with col_title:
+    st.markdown("## A-Tech Appraisal Co.")
+    st.caption("Revision & Comment Library — Field Reference")
+st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
