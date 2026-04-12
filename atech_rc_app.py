@@ -532,25 +532,46 @@ if not check_password():
 with st.sidebar:
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, width=180)
-    st.title("A-Tech R&C Library")
-    st.divider()
-    selection = st.selectbox(
-        "Select a Tool",
-        [
-            "📋 Revision Responses",
-            "📝 Appraisal Comments",
-            "🏘️ Neighborhood Descriptions",
-            "📐 Zoning Districts",
-            "🆕 UAD 3.6 Reference",
-            "✅ QC Checker",
-        ],
-        label_visibility="collapsed"
-    )
     st.divider()
     st.caption("A-Tech Appraisal Co. — Field Reference")
 
-# ── Main Header ───────────────────────────────────────────────────────────────
-st.title(selection)
+# ── Top Navigation ────────────────────────────────────────────────────────────
+PAGES = [
+    "🏘️ Neighborhood Descriptions",
+    "📐 Zoning Districts",
+    "📝 Appraisal Comments",
+    "✅ QC Checker",
+    "📋 Revision Responses",
+    "🆕 UAD 3.6 Reference",
+]
+
+if "nav_selection" not in st.session_state:
+    st.session_state["nav_selection"] = PAGES[0]
+
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] button {
+    border-radius: 20px;
+    font-size: 0.78rem;
+    padding: 0.25rem 0.6rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+nav_cols = st.columns(len(PAGES))
+for i, (col, page) in enumerate(zip(nav_cols, PAGES)):
+    with col:
+        is_active = st.session_state["nav_selection"] == page
+        if st.button(
+            page,
+            key=f"nav_{i}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary"
+        ):
+            st.session_state["nav_selection"] = page
+            st.rerun()
+
+selection = st.session_state["nav_selection"]
 st.divider()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -715,26 +736,47 @@ elif selection == "📝 Appraisal Comments":
 elif selection == "🏘️ Neighborhood Descriptions":
     neighborhoods = load_neighborhoods()
 
-    st.subheader("🏘️ Neighborhood Descriptions")
-    st.caption("Sorted by City — Neighborhood. Add descriptions as you complete assignments.")
+    # ── Admin Mode ────────────────────────────────────────────────────────────
+    if "hood_admin" not in st.session_state:
+        st.session_state["hood_admin"] = False
 
+    with st.expander("🔒 Admin Mode" if not st.session_state["hood_admin"] else "🔓 Admin Mode — Active  (click to lock)", expanded=False):
+        if not st.session_state["hood_admin"]:
+            adm_pwd = st.text_input("Enter admin password to enable editing and deleting:", type="password", key="hood_admin_pwd")
+            if st.button("Unlock", key="hood_admin_unlock"):
+                try:
+                    correct = st.secrets["APP_PASSWORD"]
+                except Exception:
+                    correct = os.environ.get("APP_PASSWORD", "atech2026")
+                if adm_pwd == correct:
+                    st.session_state["hood_admin"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+        else:
+            st.success("Admin mode is active. You can add, edit, and delete entries.")
+            if st.button("🔒 Lock Admin Mode", key="hood_admin_lock"):
+                st.session_state["hood_admin"] = False
+                st.rerun()
+
+    # ── Search + Add New ──────────────────────────────────────────────────────
     col_hs, col_ha = st.columns([4, 1])
     with col_hs:
         hood_search = st.text_input("🔍 Search", placeholder="Type city or neighborhood...", key="hood_search")
     with col_ha:
         st.write("")
         st.write("")
-        if st.button("➕ Add New", key="add_hood_btn", use_container_width=True):
-            st.session_state["show_add_hood"] = not st.session_state.get("show_add_hood", False)
+        if st.session_state["hood_admin"]:
+            if st.button("➕ Add New", key="add_hood_btn", use_container_width=True):
+                st.session_state["show_add_hood"] = not st.session_state.get("show_add_hood", False)
 
-    if st.session_state.get("show_add_hood"):
-        with st.container():
-            st.divider()
+    if st.session_state.get("show_add_hood") and st.session_state["hood_admin"]:
+        with st.container(border=True):
             st.subheader("New Neighborhood Description")
             nh_city  = st.text_input("City *", key="nh_city", placeholder="e.g. Providence")
             nh_hood  = st.text_input("Neighborhood *", key="nh_hood", placeholder="e.g. Fox Point")
             nh_desc  = st.text_area("Description *", key="nh_desc", height=140,
-                                     placeholder="Write the neighborhood description here. Include character, housing stock, amenities, market activity, etc...")
+                                     placeholder="Write the neighborhood description here.")
             nh_note  = st.text_input("Notes (optional)", key="nh_note",
                                       placeholder="e.g. Last updated March 2026")
             hc1, hc2 = st.columns(2)
@@ -753,15 +795,14 @@ elif selection == "🏘️ Neighborhood Descriptions":
                         })
                         save_neighborhoods(neighborhoods)
                         st.session_state["show_add_hood"] = False
-                        st.success("✅ Neighborhood description saved.")
+                        st.success("✅ Saved.")
                         st.rerun()
             with hc2:
                 if st.button("Cancel", use_container_width=True, key="cancel_hood"):
                     st.session_state["show_add_hood"] = False
                     st.rerun()
-            st.divider()
 
-    # Filter and sort
+    # ── Filter and sort ───────────────────────────────────────────────────────
     filtered_hoods = sorted(neighborhoods, key=lambda x: f"{x.get('city','')} {x.get('neighborhood','')}")
     if hood_search:
         q = hood_search.lower()
@@ -770,7 +811,7 @@ elif selection == "🏘️ Neighborhood Descriptions":
                           q in h.get("neighborhood","").lower() or
                           q in h.get("description","").lower()]
 
-    st.write(f"**{len(filtered_hoods)} entr{'y' if len(filtered_hoods)==1 else 'ies'}**")
+    st.caption(f"{len(filtered_hoods)} entr{'y' if len(filtered_hoods)==1 else 'ies'}")
     st.divider()
 
     if filtered_hoods:
@@ -778,18 +819,33 @@ elif selection == "🏘️ Neighborhood Descriptions":
             label = f"🏘️ {hood.get('city','')} — {hood.get('neighborhood','')}"
             with st.expander(label):
                 st.text_area(
-                    "Copy the description below:",
+                    "",
                     value=hood.get("description",""),
                     height=160,
-                    key=f"hood_text_{hood['id']}"
+                    key=f"hood_text_{hood['id']}",
+                    disabled=not st.session_state.get("hood_admin", False)
                 )
                 if hood.get("notes"):
                     st.caption(f"📝 Note: {hood['notes']}")
-                st.write("")
-                if st.button("🗑️ Delete this entry", key=f"del_hood_{hood['id']}"):
-                    neighborhoods = [h for h in neighborhoods if h["id"] != hood["id"]]
-                    save_neighborhoods(neighborhoods)
-                    st.rerun()
+
+                if st.session_state.get("hood_admin"):
+                    ha1, ha2 = st.columns(2)
+                    with ha1:
+                        edited_desc = st.session_state.get(f"hood_text_{hood['id']}", hood.get("description",""))
+                        if st.button("💾 Save Changes", key=f"save_hood_{hood['id']}", use_container_width=True):
+                            for h in neighborhoods:
+                                if h["id"] == hood["id"]:
+                                    h["description"] = edited_desc.strip()
+                            save_neighborhoods(neighborhoods)
+                            st.success("✅ Saved.")
+                            st.rerun()
+                    with ha2:
+                        if st.button("🗑️ Delete", key=f"del_hood_{hood['id']}", use_container_width=True):
+                            neighborhoods = [h for h in neighborhoods if h["id"] != hood["id"]]
+                            save_neighborhoods(neighborhoods)
+                            st.rerun()
+                else:
+                    st.caption("☝️ Click · Ctrl+A · Ctrl+C")
     else:
         st.info("No neighborhood descriptions yet. Add your first one above.")
 
