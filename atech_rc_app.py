@@ -529,12 +529,19 @@ if not check_password():
     st.stop()
 
 # ── Header ───────────────────────────────────────────────────────────────────
-col_logo, col_title = st.columns([1, 6])
-with col_logo:
-    if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=110)
-with col_title:
-    st.markdown("<div style='padding-top:18px'><h2 style='margin:0'>A-Tech Appraisal Co.</h2><p style='color:gray;font-size:0.85rem;margin:0'>Revision & Comment Library — Field Reference</p></div>", unsafe_allow_html=True)
+if os.path.exists(LOGO_PATH):
+    import base64
+    with open(LOGO_PATH, "rb") as img_f:
+        logo_b64 = base64.b64encode(img_f.read()).decode()
+    st.markdown(f"""
+    <div style="display:flex;flex-direction:column;align-items:center;padding:16px 0 8px 0;">
+        <img src="data:image/png;base64,{logo_b64}" style="height:64px;width:auto;margin-bottom:10px;">
+        <div style="font-size:1.8rem;font-weight:700;line-height:1.2;text-align:center;">A-Tech Appraisal Co.</div>
+        <div style="color:gray;font-size:0.85rem;text-align:center;">Revision & Comment Library — Field Reference</div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("<h2 style='text-align:center'>A-Tech Appraisal Co.</h2>", unsafe_allow_html=True)
 st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
