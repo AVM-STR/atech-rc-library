@@ -934,7 +934,8 @@ elif selection == "📐 Zoning Districts":
                     formatted_output = " / ".join(parts) if parts else "—"
 
                     st.text_area("", value=formatted_output, height=75,
-                                 key=f"total_{zone['id']}", disabled=True)
+                                 key=f"total_{zone['id']}",
+                                 disabled=not st.session_state.get("zone_admin", False))
                     st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
                     if st.session_state.get("zone_admin"):
