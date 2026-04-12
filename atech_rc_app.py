@@ -931,18 +931,34 @@ elif selection == "📐 Zoning Districts":
                         parts.append(f"{front_num}' lot frontage")
                     if computed_area:
                         parts.append(f"{computed_area} min lot size")
-                    formatted_output = " / ".join(parts) if parts else "—"
+                    auto_output = " / ".join(parts) if parts else "—"
 
-                    st.text_area("", value=formatted_output, height=75,
-                                 key=f"total_{zone['id']}",
-                                 disabled=not st.session_state.get("zone_admin", False))
-                    st.caption("☝️ Click · Ctrl+A · Ctrl+C")
+                    # Use saved custom text if it exists, otherwise use auto-generated
+                    display_output = zone.get("total_override") or auto_output
 
                     if st.session_state.get("zone_admin"):
-                        if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
-                            zoning = [z for z in zoning if z["id"] != zone["id"]]
-                            save_zoning(zoning)
-                            st.rerun()
+                        edited = st.text_area("", value=display_output, height=75,
+                                              key=f"total_{zone['id']}")
+                        ta1, ta2 = st.columns(2)
+                        with ta1:
+                            if st.button("💾 Save TOTAL Text", key=f"save_total_{zone['id']}",
+                                         use_container_width=True):
+                                for z in zoning:
+                                    if z["id"] == zone["id"]:
+                                        z["total_override"] = edited.strip()
+                                save_zoning(zoning)
+                                st.success("✅ Saved.")
+                                st.rerun()
+                        with ta2:
+                            if st.button("🗑️ Delete Zone", key=f"del_zone_{zone['id']}",
+                                         use_container_width=True):
+                                zoning = [z for z in zoning if z["id"] != zone["id"]]
+                                save_zoning(zoning)
+                                st.rerun()
+                    else:
+                        st.text_area("", value=display_output, height=75,
+                                     key=f"total_{zone['id']}", disabled=True)
+                        st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
                     st.divider()
     else:
