@@ -536,57 +536,29 @@ with st.sidebar:
     st.caption("A-Tech Appraisal Co. — Field Reference")
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
-PAGES = [
-    "Neighborhoods",
-    "Zoning",
-    "Comments",
-    "QC Checker",
-    "Revisions",
-    "UAD 3.6",
-]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "🏘️ Neighborhoods",
+    "📐 Zoning",
+    "📝 Comments",
+    "✅ QC Checker",
+    "📋 Revisions",
+    "🆕 UAD 3.6",
+])
 
-PAGE_MAP = {
-    "Neighborhoods": "🏘️ Neighborhood Descriptions",
-    "Zoning":        "📐 Zoning Districts",
-    "Comments":      "📝 Appraisal Comments",
-    "QC Checker":    "✅ QC Checker",
-    "Revisions":     "📋 Revision Responses",
-    "UAD 3.6":       "🆕 UAD 3.6 Reference",
+TAB_SELECTION = {
+    tab1: "🏘️ Neighborhood Descriptions",
+    tab2: "📐 Zoning Districts",
+    tab3: "📝 Appraisal Comments",
+    tab4: "✅ QC Checker",
+    tab5: "📋 Revision Responses",
+    tab6: "🆕 UAD 3.6 Reference",
 }
-
-if "nav_selection" not in st.session_state or st.session_state["nav_selection"] not in PAGE_MAP:
-    st.session_state["nav_selection"] = PAGES[0]
-
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] button {
-    border-radius: 20px;
-    font-size: 0.78rem;
-    padding: 0.25rem 0.6rem;
-}
-</style>
-""", unsafe_allow_html=True)
-
-nav_cols = st.columns(len(PAGES))
-for i, (col, page) in enumerate(zip(nav_cols, PAGES)):
-    with col:
-        is_active = st.session_state["nav_selection"] == page
-        if st.button(
-            page,
-            key=f"nav_{i}",
-            use_container_width=True,
-            type="primary" if is_active else "secondary"
-        ):
-            st.session_state["nav_selection"] = page
-            st.rerun()
-
-selection = PAGE_MAP[st.session_state["nav_selection"]]
-st.divider()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — REVISION RESPONSES
 # ══════════════════════════════════════════════════════════════════════════════
-if selection == "📋 Revision Responses":
+with tab5:
+ if True:
     revisions = load_revisions()
 
     col_rs, col_ra = st.columns([4, 1])
@@ -668,7 +640,8 @@ if selection == "📋 Revision Responses":
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — APPRAISAL COMMENTS
 # ══════════════════════════════════════════════════════════════════════════════
-elif selection == "📝 Appraisal Comments":
+with tab3:
+ if True:
     comments = load_comments()
 
     col_cs, col_ca = st.columns([4, 1])
@@ -742,7 +715,8 @@ elif selection == "📝 Appraisal Comments":
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — NEIGHBORHOOD DESCRIPTIONS
 # ══════════════════════════════════════════════════════════════════════════════
-elif selection == "🏘️ Neighborhood Descriptions":
+with tab1:
+ if True:
     neighborhoods = load_neighborhoods()
 
     # ── Admin Mode ────────────────────────────────────────────────────────────
@@ -861,7 +835,8 @@ elif selection == "🏘️ Neighborhood Descriptions":
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — ZONING DISTRICTS
 # ══════════════════════════════════════════════════════════════════════════════
-elif selection == "📐 Zoning Districts":
+with tab2:
+ if True:
     import re
     from itertools import groupby
     zoning = load_zoning()
@@ -1085,7 +1060,8 @@ elif selection == "📐 Zoning Districts":
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 5 — UAD 3.6 REFERENCE
 # ══════════════════════════════════════════════════════════════════════════════
-elif selection == "🆕 UAD 3.6 Reference":
+with tab6:
+ if True:
     st.subheader("🆕 UAD 3.6 Reference Guide")
     st.caption("Key changes, inspection requirements, ratings definitions, and tool overview. Mandatory November 2, 2026.")
 
@@ -1345,7 +1321,8 @@ The appraisal profession is going through its biggest technology shift in decade
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 6 — QC CHECKER
 # ══════════════════════════════════════════════════════════════════════════════
-elif selection == "✅ QC Checker":
+with tab4:
+ if True:
     st.markdown("## QC Checker")
     st.caption(
         "Upload a TOTAL XML export and optionally the PDF. "
