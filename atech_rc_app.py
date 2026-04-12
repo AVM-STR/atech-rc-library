@@ -745,128 +745,174 @@ elif selection == "🏘️ Neighborhood Descriptions":
 # TAB 4 — ZONING DISTRICTS
 # ══════════════════════════════════════════════════════════════════════════════
 elif selection == "📐 Zoning Districts":
+    import re
+    from itertools import groupby
     zoning = load_zoning()
 
-    st.subheader("📐 Zoning Districts & Dimensional Regulations")
-    st.caption("Sorted by City — Zoning District — Property Type.")
+    # ── Helper: detect and compute unit add-on formulas ──────────────────────
+    def parse_addon_formula(lot_str, notes_str):
+        src = (lot_str + " " + notes_str).lower()
+        # Pattern A: base SF + addon/unit [above N]
+        m = re.search(
+            r'([\d,]+)\s*sf' + r'.*?\+\s*([\d,]+)\s*sf?' +
+            r'.*?(?:per|for\s*ea\w*).*?(?:add\w*\s*)?unit' +
+            r'(?:.*?(?:above|over)\s*(\w+))?', src)
+        if m:
+            base  = int(m.group(1).replace(',',''))
+            addon = int(m.group(2).replace(',',''))
+            raw   = m.group(3)
+            w2n   = {"one":1,"two":2,"three":3,"four":4,"five":5}
+            above = w2n.get(raw, int(raw)) if raw and not raw.isdigit() else (int(raw) if raw else 1)
+            return {"base_sf": base, "addon_sf": addon, "above_n": above, "type": "sf_addon"}
+        # Pattern B: X acres + Y SF/unit
+        m2 = re.search(r'([\d.]+)\s*acres?\s*(?:\+|plus)\s*([\d,]+)\s*(?:sf\s*)?per\s*unit', src)
+        if m2:
+            return {"base_acres": float(m2.group(1)), "addon_sf": int(m2.group(2).replace(',','')), "above_n": 0, "type": "acres_addon"}
+        # Pattern C: X per unit (multiply)
+        m3 = re.search(r'([\d.]+)\s*(acres?|sf)\s*per\s*unit', src)
+        if m3:
+            if "acre" in m3.group(2):
+                return {"per_unit_acres": float(m3.group(1)), "type": "per_unit_acres"}
+            return {"per_unit_sf": int(float(m3.group(1))), "type": "per_unit_sf"}
+        return None
 
+    def compute_lot_size(formula, unit_count):
+        t = formula.get("type")
+        if t == "sf_addon":
+            extra = max(0, unit_count - formula["above_n"])
+            total = formula["base_sf"] + extra * formula["addon_sf"]
+            return f"{total:,} SF"
+        elif t == "acres_addon":
+            total_sf = int(formula["base_acres"] * 43560) + unit_count * formula["addon_sf"]
+            return f"{total_sf:,} SF"
+        elif t == "per_unit_acres":
+            return f"{formula['per_unit_acres'] * unit_count:.1f} acres"
+        elif t == "per_unit_sf":
+            return f"{formula['per_unit_sf'] * unit_count:,} SF"
+        return ""
+
+    def format_frontage(s):
+        m = re.search(r"(\d+(?:\.\d+)?)", s)
+        return m.group(1) if m else s.split("/")[0].strip()
+
+    # ── Search + Add New ──────────────────────────────────────────────────────
     col_zs, col_za = st.columns([4, 1])
     with col_zs:
-        zone_search = st.text_input("🔍 Search", placeholder="Type city, district, or property type...", key="zone_search")
+        zone_search = st.text_input("🔍 Search towns, zone codes, or keywords...",
+                                     placeholder="e.g. Warwick, R-40, sewer, two-family",
+                                     key="zone_search", label_visibility="collapsed")
     with col_za:
-        st.write("")
-        st.write("")
         if st.button("➕ Add New", key="add_zone_btn", use_container_width=True):
             st.session_state["show_add_zone"] = not st.session_state.get("show_add_zone", False)
 
     if st.session_state.get("show_add_zone"):
-        with st.container():
-            st.divider()
+        with st.container(border=True):
             st.subheader("New Zoning District")
-            zc1, zc2, zc3 = st.columns(3)
+            zc1, zc2 = st.columns(2)
             with zc1:
-                nz_city     = st.text_input("City *", key="nz_city", placeholder="e.g. Providence")
+                nz_city     = st.text_input("Town / City *", key="nz_city", placeholder="e.g. Providence")
             with zc2:
-                nz_district = st.text_input("Zoning District *", key="nz_district", placeholder="e.g. A-7")
-            with zc3:
-                nz_proptype = st.text_input("Property Type *", key="nz_proptype", placeholder="e.g. Single Family")
-
-            st.write("**Dimensional Requirements:**")
-            zd1, zd2, zd3 = st.columns(3)
+                nz_district = st.text_input("Zoning Code *", key="nz_district", placeholder="e.g. A-7")
+            zd1, zd2 = st.columns(2)
             with zd1:
-                nz_frontage = st.text_input("Min Frontage", key="nz_frontage", placeholder="e.g. 50 ft")
+                nz_frontage = st.text_input("Min Lot Frontage", key="nz_frontage", placeholder="e.g. 70'")
             with zd2:
-                nz_lotarea  = st.text_input("Min Lot Area", key="nz_lotarea", placeholder="e.g. 6,000 sq ft")
-            with zd3:
-                nz_lotwidth = st.text_input("Min Lot Width", key="nz_lotwidth", placeholder="e.g. 50 ft")
-
-            zd4, zd5, zd6 = st.columns(3)
-            with zd4:
-                nz_frontyard = st.text_input("Front Yard Setback", key="nz_frontyard", placeholder="e.g. 20 ft")
-            with zd5:
-                nz_sideyard  = st.text_input("Side Yard Setback", key="nz_sideyard", placeholder="e.g. 5 ft each")
-            with zd6:
-                nz_rearyard  = st.text_input("Rear Yard Setback", key="nz_rearyard", placeholder="e.g. 20 ft")
-
-            zd7, zd8, zd9 = st.columns(3)
-            with zd7:
-                nz_maxheight = st.text_input("Max Building Height", key="nz_maxheight", placeholder="e.g. 35 ft")
-            with zd8:
-                nz_maxlotcov = st.text_input("Max Lot Coverage", key="nz_maxlotcov", placeholder="e.g. 40%")
-            with zd9:
-                nz_maxfloors = st.text_input("Max Stories", key="nz_maxfloors", placeholder="e.g. 2.5")
-
-            nz_notes = st.text_input("Additional Notes (optional)", key="nz_notes",
-                                      placeholder="e.g. Corner lots may have reduced side yard; source: Providence Zoning Ordinance 2024")
-
+                nz_lotarea  = st.text_input("Min Lot Area", key="nz_lotarea", placeholder="e.g. 7,000 SF")
+            nz_notes = st.text_area("Notes (optional)", key="nz_notes", height=80,
+                                     placeholder="e.g. +7,500 SF per additional unit; with public sewer only")
             zb1, zb2 = st.columns(2)
             with zb1:
-                if st.button("💾 Save Zoning District", use_container_width=True, key="save_zone"):
-                    if not nz_city.strip() or not nz_district.strip() or not nz_proptype.strip():
-                        st.error("City, Zoning District, and Property Type are required.")
+                if st.button("💾 Save", use_container_width=True, key="save_zone"):
+                    if not nz_city.strip() or not nz_district.strip():
+                        st.error("Town and Zoning Code are required.")
                     else:
                         import uuid
                         zoning.append({
-                            "id":            str(uuid.uuid4())[:8],
-                            "city":          nz_city.strip(),
-                            "district":      nz_district.strip(),
-                            "property_type": nz_proptype.strip(),
-                            "frontage":      nz_frontage.strip(),
-                            "lot_area":      nz_lotarea.strip(),
-                            "lot_width":     nz_lotwidth.strip(),
-                            "front_yard":    nz_frontyard.strip(),
-                            "side_yard":     nz_sideyard.strip(),
-                            "rear_yard":     nz_rearyard.strip(),
-                            "max_height":    nz_maxheight.strip(),
-                            "max_lot_cov":   nz_maxlotcov.strip(),
-                            "max_floors":    nz_maxfloors.strip(),
-                            "notes":         nz_notes.strip(),
+                            "id": str(uuid.uuid4())[:8],
+                            "city": nz_city.strip(), "district": nz_district.strip(),
+                            "property_type": "", "frontage": nz_frontage.strip(),
+                            "lot_area": nz_lotarea.strip(), "lot_width": "",
+                            "front_yard": "", "side_yard": "", "rear_yard": "",
+                            "max_height": "", "max_lot_cov": "", "max_floors": "",
+                            "notes": nz_notes.strip(),
                         })
                         save_zoning(zoning)
                         st.session_state["show_add_zone"] = False
-                        st.success("✅ Zoning district saved.")
+                        st.success("✅ Saved.")
                         st.rerun()
             with zb2:
                 if st.button("Cancel", use_container_width=True, key="cancel_zone"):
                     st.session_state["show_add_zone"] = False
                     st.rerun()
-            st.divider()
 
-    # Filter and sort
-    filtered_zones = sorted(zoning, key=lambda x: f"{x.get('city','')} {x.get('district','')} {x.get('property_type','')}")
+    # ── Filter & Sort ─────────────────────────────────────────────────────────
+    filtered_zones = sorted(zoning, key=lambda x: (x.get("city","").lower(), x.get("district","").lower()))
     if zone_search:
         q = zone_search.lower()
         filtered_zones = [z for z in filtered_zones if
                           q in z.get("city","").lower() or
                           q in z.get("district","").lower() or
-                          q in z.get("property_type","").lower()]
+                          q in z.get("notes","").lower() or
+                          q in z.get("lot_area","").lower()]
 
-    st.write(f"**{len(filtered_zones)} entr{'y' if len(filtered_zones)==1 else 'ies'}**")
+    st.caption(f"{len(filtered_zones)} entr{'y' if len(filtered_zones)==1 else 'ies'}")
     st.divider()
 
+    # ── Display grouped by town ───────────────────────────────────────────────
     if filtered_zones:
-        for zone in filtered_zones:
-            label = f"📐 {zone.get('city','')} — {zone.get('district','')} — {zone.get('property_type','')}"
-            with st.expander(label):
-                # Display only the key fields
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown("**Min Lot Frontage**")
-                    st.write(zone.get("frontage","—") or "—")
-                with col_b:
-                    st.markdown("**Min Lot Area**")
-                    st.write(zone.get("lot_area","—") or "—")
+        for town, group in groupby(filtered_zones, key=lambda x: x.get("city","")):
+            st.markdown(f"### 🏙️ {town}")
+            for zone in group:
+                district = zone.get("district","")
+                frontage = zone.get("frontage","") or ""
+                lot_area = zone.get("lot_area","")  or ""
+                notes    = zone.get("notes","")     or ""
+                formula  = parse_addon_formula(lot_area, notes)
 
-                if zone.get("notes"):
-                    st.markdown("**📝 Notes**")
-                    st.info(zone["notes"])
-                st.write("")
-                if st.button("🗑️ Delete this entry", key=f"del_zone_{zone['id']}"):
-                    zoning = [z for z in zoning if z["id"] != zone["id"]]
-                    save_zoning(zoning)
-                    st.rerun()
+                with st.expander(f"📐  {district}"):
+                    # Key fields
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown("**Min Lot Frontage**")
+                        st.markdown(f"`{frontage}`" if frontage else "—")
+                    with col_b:
+                        st.markdown("**Min Lot Area**")
+                        st.markdown(f"`{lot_area}`" if lot_area else "—")
+                    if notes:
+                        st.markdown(f"*📝 {notes}*")
+
+                    st.divider()
+
+                    # TOTAL formatter
+                    st.markdown("**📋 Format for TOTAL**")
+                    if formula:
+                        unit_count = st.number_input(
+                            "Number of units", min_value=1, max_value=50,
+                            value=2, step=1, key=f"units_{zone['id']}"
+                        )
+                        computed_area = compute_lot_size(formula, unit_count)
+                    else:
+                        computed_area = lot_area
+
+                    front_num = format_frontage(frontage) if frontage else ""
+                    parts = []
+                    if front_num:
+                        parts.append(f"{front_num}' lot frontage")
+                    if computed_area:
+                        parts.append(f"{computed_area} min lot size")
+                    formatted_output = " / ".join(parts) if parts else "—"
+
+                    st.text_area("", value=formatted_output, height=75,
+                                 key=f"total_{zone['id']}")
+                    st.caption("☝️ Click · Ctrl+A · Ctrl+C")
+
+                    st.write("")
+                    if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
+                        zoning = [z for z in zoning if z["id"] != zone["id"]]
+                        save_zoning(zoning)
+                        st.rerun()
     else:
-        st.info("No zoning districts saved yet. Add your first entry above.")
+        st.info("No results. Try a different search or add a new entry.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════════
