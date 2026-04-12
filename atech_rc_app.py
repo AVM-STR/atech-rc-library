@@ -805,6 +805,29 @@ elif selection == "📐 Zoning Districts":
         m = re.search(r"(\d+(?:\.\d+)?)", s)
         return m.group(1) if m else s.split("/")[0].strip()
 
+    # ── Admin Mode ───────────────────────────────────────────────────────────
+    if "zone_admin" not in st.session_state:
+        st.session_state["zone_admin"] = False
+
+    with st.expander("🔒 Admin Mode" if not st.session_state["zone_admin"] else "🔓 Admin Mode — Active  (click to lock)", expanded=False):
+        if not st.session_state["zone_admin"]:
+            adm_pwd = st.text_input("Enter admin password to enable editing and deleting:", type="password", key="zone_admin_pwd")
+            if st.button("Unlock", key="zone_admin_unlock"):
+                try:
+                    correct = st.secrets["APP_PASSWORD"]
+                except Exception:
+                    correct = os.environ.get("APP_PASSWORD", "atech2026")
+                if adm_pwd == correct:
+                    st.session_state["zone_admin"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+        else:
+            st.success("Admin mode is active. You can add, edit, and delete entries.")
+            if st.button("🔒 Lock Admin Mode", key="zone_admin_lock"):
+                st.session_state["zone_admin"] = False
+                st.rerun()
+
     # ── Search + Add New ──────────────────────────────────────────────────────
     col_zs, col_za = st.columns([4, 1])
     with col_zs:
@@ -812,10 +835,11 @@ elif selection == "📐 Zoning Districts":
                                      placeholder="e.g. Warwick, R-40, sewer, two-family",
                                      key="zone_search", label_visibility="collapsed")
     with col_za:
-        if st.button("➕ Add New", key="add_zone_btn", use_container_width=True):
-            st.session_state["show_add_zone"] = not st.session_state.get("show_add_zone", False)
+        if st.session_state["zone_admin"]:
+            if st.button("➕ Add New", key="add_zone_btn", use_container_width=True):
+                st.session_state["show_add_zone"] = not st.session_state.get("show_add_zone", False)
 
-    if st.session_state.get("show_add_zone"):
+    if st.session_state.get("show_add_zone") and st.session_state["zone_admin"]:
         with st.container(border=True):
             st.subheader("New Zoning District")
             zc1, zc2 = st.columns(2)
@@ -913,10 +937,11 @@ elif selection == "📐 Zoning Districts":
                                  key=f"total_{zone['id']}", disabled=True)
                     st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
-                    if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
-                        zoning = [z for z in zoning if z["id"] != zone["id"]]
-                        save_zoning(zoning)
-                        st.rerun()
+                    if st.session_state.get("zone_admin"):
+                        if st.button("🗑️ Delete", key=f"del_zone_{zone['id']}"):
+                            zoning = [z for z in zoning if z["id"] != zone["id"]]
+                            save_zoning(zoning)
+                            st.rerun()
 
                     st.divider()
     else:
