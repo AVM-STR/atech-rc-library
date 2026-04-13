@@ -602,6 +602,53 @@ with st.expander("💾 Export All Data — Download for GitHub backup", expanded
         )
         st.info("Extract the ZIP and commit all 5 JSON files to your GitHub repo before redeploying.")
 
+# ── ALL CAPS Toggle + Global Admin ───────────────────────────────────────────
+if "site_admin" not in st.session_state:
+    st.session_state["site_admin"] = False
+if "all_caps" not in st.session_state:
+    st.session_state["all_caps"] = False
+
+hdr1, hdr2, hdr3 = st.columns([1, 1, 3])
+with hdr1:
+    caps_label = "🔠 ALL CAPS: ON" if st.session_state["all_caps"] else "🔡 ALL CAPS: OFF"
+    if st.button(caps_label, key="caps_toggle", use_container_width=True):
+        st.session_state["all_caps"] = not st.session_state["all_caps"]
+        st.rerun()
+with hdr2:
+    if not st.session_state["site_admin"]:
+        if st.button("🔒 Admin: OFF", key="admin_toggle_btn", use_container_width=True):
+            st.session_state["show_admin_login"] = True
+            st.rerun()
+    else:
+        if st.button("🔓 Admin: ON", key="admin_toggle_btn", use_container_width=True):
+            st.session_state["site_admin"] = False
+            st.session_state["show_admin_login"] = False
+            st.rerun()
+
+if st.session_state.get("show_admin_login") and not st.session_state["site_admin"]:
+    with st.container():
+        adm_col1, adm_col2, adm_col3 = st.columns([2, 1, 3])
+        with adm_col1:
+            adm_pwd = st.text_input("Admin password:", type="password", key="global_admin_pwd", label_visibility="collapsed", placeholder="Enter admin password...")
+        with adm_col2:
+            if st.button("Unlock", key="global_admin_unlock", use_container_width=True):
+                try:
+                    correct = st.secrets["APP_PASSWORD"]
+                except Exception:
+                    correct = os.environ.get("APP_PASSWORD", "atech2026")
+                if adm_pwd == correct:
+                    st.session_state["site_admin"] = True
+                    st.session_state["show_admin_login"] = False
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+
+def caps(text):
+    """Apply ALL CAPS transformation if toggle is on."""
+    if st.session_state.get("all_caps") and text:
+        return str(text).upper()
+    return text
+
 st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
@@ -638,8 +685,11 @@ with tab5:
     with col_ra:
         st.write("")
         st.write("")
-        if st.button("➕ Add New", key="add_rev_btn", use_container_width=True):
-            st.session_state["show_add_rev"] = not st.session_state.get("show_add_rev", False)
+        if st.session_state.get("site_admin"):
+            if st.button("➕ Add New", key="add_rev_btn", use_container_width=True):
+                st.session_state["show_add_rev"] = not st.session_state.get("show_add_rev", False)
+        else:
+            st.caption("🔒 Admin")
 
     if st.session_state.get("show_add_rev"):
         with st.container():
@@ -696,17 +746,18 @@ with tab5:
             st.markdown("**Appraiser Response:**")
             st.text_area(
                 "Copy the text below:",
-                value=rev.get("response",""),
+                value=caps(rev.get("response","")),
                 height=160,
                 key=f"rev_text_{rev['id']}"
             )
             if rev.get("notes"):
                 st.caption(f"📝 Note: {rev['notes']}")
             st.write("")
-            if st.button("🗑️ Delete this entry", key=f"del_rev_{rev['id']}"):
-                revisions = [r for r in revisions if r["id"] != rev["id"]]
-                save_revisions(revisions)
-                st.rerun()
+            if st.session_state.get("site_admin"):
+                if st.button("🗑️ Delete this entry", key=f"del_rev_{rev['id']}"):
+                    revisions = [r for r in revisions if r["id"] != rev["id"]]
+                    save_revisions(revisions)
+                    st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — APPRAISAL COMMENTS
@@ -721,8 +772,11 @@ with tab3:
     with col_ca:
         st.write("")
         st.write("")
-        if st.button("➕ Add New", key="add_com_btn", use_container_width=True):
-            st.session_state["show_add_com"] = not st.session_state.get("show_add_com", False)
+        if st.session_state.get("site_admin"):
+            if st.button("➕ Add New", key="add_com_btn", use_container_width=True):
+                st.session_state["show_add_com"] = not st.session_state.get("show_add_com", False)
+        else:
+            st.caption("🔒 Admin")
 
     if st.session_state.get("show_add_com"):
         with st.container():
@@ -771,17 +825,18 @@ with tab3:
         with st.expander(f"📝 {com.get('category','Untitled')}"):
             st.text_area(
                 "Copy the text below:",
-                value=com.get("text",""),
+                value=caps(com.get("text","")),
                 height=160,
                 key=f"com_text_{com['id']}"
             )
             if com.get("notes"):
                 st.caption(f"📝 Note: {com['notes']}")
             st.write("")
-            if st.button("🗑️ Delete this entry", key=f"del_com_{com['id']}"):
-                comments = [c for c in comments if c["id"] != com["id"]]
-                save_comments(comments)
-                st.rerun()
+            if st.session_state.get("site_admin"):
+                if st.button("🗑️ Delete this entry", key=f"del_com_{com['id']}"):
+                    comments = [c for c in comments if c["id"] != com["id"]]
+                    save_comments(comments)
+                    st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — NEIGHBORHOOD DESCRIPTIONS
@@ -791,27 +846,6 @@ with tab1:
     neighborhoods = load_neighborhoods()
 
     # ── Admin Mode ────────────────────────────────────────────────────────────
-    if "hood_admin" not in st.session_state:
-        st.session_state["hood_admin"] = False
-
-    with st.expander("🔒 Admin Mode" if not st.session_state["hood_admin"] else "🔓 Admin Mode — Active  (click to lock)", expanded=False):
-        if not st.session_state["hood_admin"]:
-            adm_pwd = st.text_input("Enter admin password to enable editing and deleting:", type="password", key="hood_admin_pwd")
-            if st.button("Unlock", key="hood_admin_unlock"):
-                try:
-                    correct = st.secrets["APP_PASSWORD"]
-                except Exception:
-                    correct = os.environ.get("APP_PASSWORD", "atech2026")
-                if adm_pwd == correct:
-                    st.session_state["hood_admin"] = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password.")
-        else:
-            st.success("Admin mode is active. You can add, edit, and delete entries.")
-            if st.button("🔒 Lock Admin Mode", key="hood_admin_lock"):
-                st.session_state["hood_admin"] = False
-                st.rerun()
 
     # ── Search + Add New ──────────────────────────────────────────────────────
     col_hs, col_ha = st.columns([4, 1])
@@ -820,11 +854,11 @@ with tab1:
     with col_ha:
         st.write("")
         st.write("")
-        if st.session_state["hood_admin"]:
+        if st.session_state["site_admin"]:
             if st.button("➕ Add New", key="add_hood_btn", use_container_width=True):
                 st.session_state["show_add_hood"] = not st.session_state.get("show_add_hood", False)
 
-    if st.session_state.get("show_add_hood") and st.session_state["hood_admin"]:
+    if st.session_state.get("show_add_hood") and st.session_state["site_admin"]:
         with st.container(border=True):
             st.subheader("New Neighborhood Description")
             nh_city  = st.text_input("City *", key="nh_city", placeholder="e.g. Providence")
@@ -876,16 +910,16 @@ with tab1:
             with st.expander(label):
                 st.text_area(
                     "Neighborhood description",
-                    value=hood.get("description",""),
+                    value=caps(hood.get("description","")),
                     height=160,
                     key=f"hood_text_{hood['id']}",
-                    disabled=not st.session_state.get("hood_admin", False),
+                    disabled=not st.session_state.get("site_admin", False),
                     label_visibility="collapsed"
                 )
                 if hood.get("notes"):
                     st.caption(f"📝 Note: {hood['notes']}")
 
-                if st.session_state.get("hood_admin"):
+                if st.session_state.get("site_admin"):
                     ha1, ha2 = st.columns(2)
                     with ha1:
                         edited_desc = st.session_state.get(f"hood_text_{hood['id']}", hood.get("description",""))
@@ -972,27 +1006,6 @@ with tab2:
         return m.group(1) if m else s.split("/")[0].strip()
 
     # ── Admin Mode ───────────────────────────────────────────────────────────
-    if "zone_admin" not in st.session_state:
-        st.session_state["zone_admin"] = False
-
-    with st.expander("🔒 Admin Mode" if not st.session_state["zone_admin"] else "🔓 Admin Mode — Active  (click to lock)", expanded=False):
-        if not st.session_state["zone_admin"]:
-            adm_pwd = st.text_input("Enter admin password to enable editing and deleting:", type="password", key="zone_admin_pwd")
-            if st.button("Unlock", key="zone_admin_unlock"):
-                try:
-                    correct = st.secrets["APP_PASSWORD"]
-                except Exception:
-                    correct = os.environ.get("APP_PASSWORD", "atech2026")
-                if adm_pwd == correct:
-                    st.session_state["zone_admin"] = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password.")
-        else:
-            st.success("Admin mode is active. You can add, edit, and delete entries.")
-            if st.button("🔒 Lock Admin Mode", key="zone_admin_lock"):
-                st.session_state["zone_admin"] = False
-                st.rerun()
 
     # ── Search + Add New ──────────────────────────────────────────────────────
     col_zs, col_za = st.columns([4, 1])
@@ -1001,11 +1014,11 @@ with tab2:
                                      placeholder="e.g. Warwick, R-40, sewer, two-family",
                                      key="zone_search", label_visibility="collapsed")
     with col_za:
-        if st.session_state["zone_admin"]:
+        if st.session_state["site_admin"]:
             if st.button("➕ Add New", key="add_zone_btn", use_container_width=True):
                 st.session_state["show_add_zone"] = not st.session_state.get("show_add_zone", False)
 
-    if st.session_state.get("show_add_zone") and st.session_state["zone_admin"]:
+    if st.session_state.get("show_add_zone") and st.session_state["site_admin"]:
         with st.container(border=True):
             st.subheader("New Zoning District")
             zc1, zc2 = st.columns(2)
@@ -1102,8 +1115,8 @@ with tab2:
                     # Use saved custom text if it exists, otherwise use auto-generated
                     display_output = zone.get("total_override") or auto_output
 
-                    if st.session_state.get("zone_admin"):
-                        edited = st.text_area("TOTAL quicklist text", value=display_output, height=75,
+                    if st.session_state.get("site_admin"):
+                        edited = st.text_area("TOTAL quicklist text", value=caps(display_output), height=75,
                                               key=f"total_{zone['id']}", label_visibility="collapsed")
                         ta1, ta2 = st.columns(2)
                         with ta1:
@@ -1122,7 +1135,7 @@ with tab2:
                                 save_zoning(zoning)
                                 st.rerun()
                     else:
-                        st.text_area("TOTAL quicklist text", value=display_output, height=75,
+                        st.text_area("TOTAL quicklist text", value=caps(display_output), height=75,
                                      key=f"total_{zone['id']}", disabled=True, label_visibility="collapsed")
                         st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
@@ -2080,27 +2093,6 @@ with tab6:
     def _ag(k):
         return st.session_state.get("adj_" + k, ADJ_DEFAULT_RATES.get(k, 0))
 
-    if "adj_admin" not in st.session_state:
-        st.session_state["adj_admin"] = False
-
-    with st.expander("Admin Mode", expanded=False):
-        if not st.session_state["adj_admin"]:
-            adm_pwd = st.text_input("Admin password:", type="password", key="adj_admin_pwd")
-            if st.button("Unlock", key="adj_admin_unlock"):
-                try:
-                    correct = st.secrets["APP_PASSWORD"]
-                except Exception:
-                    correct = os.environ.get("APP_PASSWORD", "atech2026")
-                if adm_pwd == correct:
-                    st.session_state["adj_admin"] = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password.")
-        else:
-            st.success("Admin mode active.")
-            if st.button("Lock", key="adj_admin_lock"):
-                st.session_state["adj_admin"] = False
-                st.rerun()
 
     st.divider()
     presets = load_adj_presets()
@@ -2116,7 +2108,7 @@ with tab6:
                         st.session_state["adj_" + k2] = v2
                     st.success("Loaded: " + match["name"])
                     st.rerun()
-        if st.session_state.get("adj_admin"):
+        if st.session_state.get("site_admin"):
             st.markdown("---")
             if preset_names:
                 ow = st.selectbox("Overwrite", preset_names, key="adj_ow_sel")
@@ -2350,5 +2342,5 @@ with tab6:
     if st.session_state.get("adj_output"):
         out = st.session_state["adj_output"]
         st.markdown("**Generated Paragraph** — " + str(len(out)) + " characters")
-        st.text_area("Paragraph output", value=out, height=220, key="adj_out_display", label_visibility="collapsed")
+        st.text_area("Paragraph output", value=caps(out), height=220, key="adj_out_display", label_visibility="collapsed")
         st.caption("Click in the box, Ctrl+A, Ctrl+C to copy.")
