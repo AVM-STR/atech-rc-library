@@ -2064,28 +2064,26 @@ with tab4:
             for p in passes:
                 st.success(f"**{p['cat']}:** {p['msg']}")
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 # TAB 6 — ADJUSTMENT COMMENTARY GENERATOR
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 with tab6:
  if True:
-    st.subheader("🔧 Adjustment Commentary Generator")
-    st.caption("Configure adjustment rates, select applicable items, and generate paste-ready addendum language.")
+    st.subheader("Adjustment Commentary Generator")
+    st.caption("Configure rates, select items, and generate paste-ready addendum language.")
     st.divider()
 
-    # ── Initialize session state defaults ─────────────────────────────────────
     for _k, _v in ADJ_DEFAULT_RATES.items():
-        if f"adj_{_k}" not in st.session_state:
-            st.session_state[f"adj_{_k}"] = _v
+        if "adj_" + _k not in st.session_state:
+            st.session_state["adj_" + _k] = _v
 
     def _ag(k):
-        return st.session_state.get(f"adj_{k}", ADJ_DEFAULT_RATES.get(k, 0))
+        return st.session_state.get("adj_" + k, ADJ_DEFAULT_RATES.get(k, 0))
 
-    # ── Admin lock ────────────────────────────────────────────────────────────
     if "adj_admin" not in st.session_state:
         st.session_state["adj_admin"] = False
 
-    with st.expander("🔒 Admin Mode" if not st.session_state["adj_admin"] else "🔓 Admin Mode — Active", expanded=False):
+    with st.expander("Admin Mode", expanded=False):
         if not st.session_state["adj_admin"]:
             adm_pwd = st.text_input("Admin password:", type="password", key="adj_admin_pwd")
             if st.button("Unlock", key="adj_admin_unlock"):
@@ -2099,143 +2097,127 @@ with tab6:
                 else:
                     st.error("Incorrect password.")
         else:
-            st.success("Admin mode active — you can save, edit, and delete presets.")
-            if st.button("🔒 Lock", key="adj_admin_lock"):
+            st.success("Admin mode active.")
+            if st.button("Lock", key="adj_admin_lock"):
                 st.session_state["adj_admin"] = False
                 st.rerun()
 
     st.divider()
-
-    # ── Presets ───────────────────────────────────────────────────────────────
     presets = load_adj_presets()
     preset_names = [p["name"] for p in presets]
 
-    with st.expander("💾 Presets — Save & Load", expanded=True):
+    with st.expander("Presets", expanded=True):
         if preset_names:
-            _sel = st.selectbox("Load preset", preset_names, key="adj_load_sel")
-            if st.button("⬇️ Load", key="adj_load_btn", use_container_width=True):
-                _match = next((p for p in presets if p["name"] == _sel), None)
-                if _match:
-                    for _k, _v in _match["rates"].items():
-                        st.session_state[f"adj_{_k}"] = _v
-                    st.success(f"Loaded: {_match['name']}")
+            sel = st.selectbox("Load preset", preset_names, key="adj_load_sel")
+            if st.button("Load", key="adj_load_btn", use_container_width=True):
+                match = next((p for p in presets if p["name"] == sel), None)
+                if match:
+                    for k2, v2 in match["rates"].items():
+                        st.session_state["adj_" + k2] = v2
+                    st.success("Loaded: " + match["name"])
                     st.rerun()
-        else:
-            st.info("No presets yet.")
-
         if st.session_state.get("adj_admin"):
             st.markdown("---")
             if preset_names:
-                _ow = st.selectbox("Overwrite preset", preset_names, key="adj_ow_sel")
-                if st.button("💾 Save → Overwrite", key="adj_ow_btn", use_container_width=True):
-                    _rates = {k: st.session_state.get(f"adj_{k}", ADJ_DEFAULT_RATES.get(k, 0)) for k in ADJ_DEFAULT_RATES}
+                ow = st.selectbox("Overwrite", preset_names, key="adj_ow_sel")
+                if st.button("Save to preset", key="adj_ow_btn", use_container_width=True):
+                    rates2 = {k2: st.session_state.get("adj_" + k2, ADJ_DEFAULT_RATES.get(k2, 0)) for k2 in ADJ_DEFAULT_RATES}
                     for p in presets:
-                        if p["name"] == _ow:
-                            p["rates"] = _rates
+                        if p["name"] == ow:
+                            p["rates"] = rates2
                     save_adj_presets(presets)
-                    st.success(f"Saved into: {_ow}")
+                    st.success("Saved into: " + ow)
                     st.rerun()
-            _nn = st.text_input("New preset name", key="adj_new_name", placeholder="e.g. SFR Waterfront")
-            if st.button("💾 Save as New", key="adj_save_new", use_container_width=True):
-                if not _nn.strip():
+            nn = st.text_input("New preset name", key="adj_new_name", placeholder="e.g. SFR Waterfront")
+            if st.button("Save as new", key="adj_save_new", use_container_width=True):
+                if not nn.strip():
                     st.error("Enter a name.")
                 elif len(presets) >= 6:
                     st.error("Max 6 presets.")
-                elif any(p["name"] == _nn.strip() for p in presets):
-                    st.error("Name already exists.")
+                elif any(p["name"] == nn.strip() for p in presets):
+                    st.error("Name exists.")
                 else:
-                    _rates = {k: st.session_state.get(f"adj_{k}", ADJ_DEFAULT_RATES.get(k, 0)) for k in ADJ_DEFAULT_RATES}
-                    presets.append({"name": _nn.strip(), "rates": _rates})
+                    rates2 = {k2: st.session_state.get("adj_" + k2, ADJ_DEFAULT_RATES.get(k2, 0)) for k2 in ADJ_DEFAULT_RATES}
+                    presets.append({"name": nn.strip(), "rates": rates2})
                     save_adj_presets(presets)
-                    st.success(f"Saved: {_nn.strip()}")
+                    st.success("Saved: " + nn.strip())
                     st.rerun()
             if preset_names:
-                _dl = st.selectbox("Delete preset", preset_names, key="adj_del_sel")
-                if st.button("🗑️ Delete", key="adj_del_btn", use_container_width=True):
-                    save_adj_presets([p for p in presets if p["name"] != _dl])
-                    st.success(f"Deleted: {_dl}")
+                dl = st.selectbox("Delete", preset_names, key="adj_del_sel")
+                if st.button("Delete preset", key="adj_del_btn", use_container_width=True):
+                    save_adj_presets([p for p in presets if p["name"] != dl])
                     st.rerun()
         else:
-            st.caption("🔒 Unlock Admin Mode to save or edit presets.")
+            st.caption("Unlock Admin Mode to save or edit presets.")
 
-    if st.button("↺ Reset to Defaults", key="adj_reset"):
-        for _k, _v in ADJ_DEFAULT_RATES.items():
-            st.session_state[f"adj_{_k}"] = _v
-        for _k in [k for k in st.session_state if k.startswith("adjx_")]:
-            del st.session_state[_k]
+    if st.button("Reset to Defaults", key="adj_reset"):
+        for k2, v2 in ADJ_DEFAULT_RATES.items():
+            st.session_state["adj_" + k2] = v2
+        for k2 in [k3 for k3 in st.session_state if k3.startswith("adjx_")]:
+            del st.session_state[k2]
         st.rerun()
 
     st.divider()
-
-    # ── Core rates ────────────────────────────────────────────────────────────
     st.markdown("#### Core Adjustment Rates")
     st.caption("Set any rate to $0 to omit from paragraph.")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        gla_val  = st.number_input("GLA (per SF over 50 SF)", min_value=0, value=int(_ag("gla")), step=1, key="adj_gla", format="%d")
+        gla_val = st.number_input("GLA (per SF over 50 SF)", min_value=0, value=int(_ag("gla")), step=1, key="adj_gla", format="%d")
     with c2:
-        bed_val  = st.number_input("Bedroom", min_value=0, value=int(_ag("bed")), step=500, key="adj_bed", format="%d")
-        bed_in_gla = st.checkbox("Bedroom adj in GLA", key="adjx_bed_in_gla", help="Check when bedroom difference is captured by GLA adj.")
+        bed_val = st.number_input("Bedroom", min_value=0, value=int(_ag("bed")), step=500, key="adj_bed", format="%d")
+        bed_in_gla = st.checkbox("Bedroom adj in GLA", key="adjx_bed_in_gla")
     with c3:
-        fb_val   = st.number_input("Full Bath", min_value=0, value=int(_ag("fullbath")), step=500, key="adj_fullbath", format="%d")
+        fb_val = st.number_input("Full Bath", min_value=0, value=int(_ag("fullbath")), step=500, key="adj_fullbath", format="%d")
     with c4:
-        hb_val   = st.number_input("Half Bath", min_value=0, value=int(_ag("halfbath")), step=500, key="adj_halfbath", format="%d")
-
+        hb_val = st.number_input("Half Bath", min_value=0, value=int(_ag("halfbath")), step=500, key="adj_halfbath", format="%d")
     c5, c6, c7, c8 = st.columns(4)
     with c5:
-        bas_val  = st.number_input("Basement", min_value=0, value=int(_ag("basement")), step=500, key="adj_basement", format="%d")
+        bas_val = st.number_input("Basement", min_value=0, value=int(_ag("basement")), step=500, key="adj_basement", format="%d")
     with c6:
-        gar_val  = st.number_input("Garage (per stall)", min_value=0, value=int(_ag("garage")), step=500, key="adj_garage", format="%d")
+        gar_val = st.number_input("Garage (per stall)", min_value=0, value=int(_ag("garage")), step=500, key="adj_garage", format="%d")
     with c7:
-        enc_val  = st.number_input("Enclosed Porch", min_value=0, value=int(_ag("encporch")), step=500, key="adj_encporch", format="%d")
+        enc_val = st.number_input("Enclosed Porch", min_value=0, value=int(_ag("encporch")), step=500, key="adj_encporch", format="%d")
     with c8:
         deck_val = st.number_input("Deck/Open Porch/Patio", min_value=0, value=int(_ag("deck")), step=500, key="adj_deck", format="%d")
-
     c9, c10 = st.columns(2)
     with c9:
-        fp_val   = st.number_input("Fireplace/Woodstove", min_value=0, value=int(_ag("fp")), step=500, key="adj_fp", format="%d")
+        fp_val = st.number_input("Fireplace/Woodstove", min_value=0, value=int(_ag("fp")), step=500, key="adj_fp", format="%d")
     with c10:
-        bgr_val  = st.number_input("Below-Grade Rooms (each)", min_value=0, value=int(_ag("bgr")), step=500, key="adj_bgr", format="%d")
+        bgr_val = st.number_input("Below-Grade Rooms (each)", min_value=0, value=int(_ag("bgr")), step=500, key="adj_bgr", format="%d")
 
     st.divider()
-
-    # ── Additional features ───────────────────────────────────────────────────
     st.markdown("#### Additional Feature Adjustments")
     st.caption("Check box to include in paragraph.")
     f1, f2, f3, f4, f5 = st.columns(5)
     with f1:
-        pool_val    = st.number_input("In-Ground Pool", min_value=0, value=int(_ag("pool")), step=1000, key="adj_pool", format="%d")
-        use_pool    = st.checkbox("Include Pool", key="adjx_use_pool")
+        pool_val = st.number_input("In-Ground Pool", min_value=0, value=int(_ag("pool")), step=1000, key="adj_pool", format="%d")
+        use_pool = st.checkbox("Include Pool", key="adjx_use_pool")
     with f2:
-        cac_val     = st.number_input("Central AC", min_value=0, value=int(_ag("cac")), step=500, key="adj_cac", format="%d")
-        use_cac     = st.checkbox("Include Central AC", key="adjx_use_cac")
+        cac_val = st.number_input("Central AC", min_value=0, value=int(_ag("cac")), step=500, key="adj_cac", format="%d")
+        use_cac = st.checkbox("Include Central AC", key="adjx_use_cac")
     with f3:
-        solar_val   = st.number_input("Solar", min_value=0, value=int(_ag("solar")), step=1000, key="adj_solar", format="%d")
-        use_solar   = st.checkbox("Include Solar", key="adjx_use_solar")
+        solar_val = st.number_input("Solar", min_value=0, value=int(_ag("solar")), step=1000, key="adj_solar", format="%d")
+        use_solar = st.checkbox("Include Solar", key="adjx_use_solar")
     with f4:
-        adu_val     = st.number_input("ADU", min_value=0, value=int(_ag("adu")), step=1000, key="adj_adu", format="%d")
-        use_adu     = st.checkbox("Include ADU", key="adjx_use_adu")
+        adu_val = st.number_input("ADU", min_value=0, value=int(_ag("adu")), step=1000, key="adj_adu", format="%d")
+        use_adu = st.checkbox("Include ADU", key="adjx_use_adu")
     with f5:
         outbldg_val = st.number_input("Out Building", min_value=0, value=int(_ag("outbldg")), step=500, key="adj_outbldg", format="%d")
         use_outbldg = st.checkbox("Include Out Building", key="adjx_use_outbldg")
 
     st.divider()
-
-    # ── Site size ─────────────────────────────────────────────────────────────
     st.markdown("#### Site Size Adjustment")
     s1, s2 = st.columns(2)
     with s1:
-        _su_map = {"none": "Not used", "sf": "Per SF", "acre": "Per acre"}
-        _su_cur = _su_map.get(str(_ag("site_unit")), "Not used")
+        su_map = {"none": "Not used", "sf": "Per SF", "acre": "Per acre"}
+        su_cur = su_map.get(str(_ag("site_unit")), "Not used")
         site_unit = st.selectbox("Unit", ["Not used", "Per SF", "Per acre"],
-                                  index=["Not used", "Per SF", "Per acre"].index(_su_cur),
+                                  index=["Not used", "Per SF", "Per acre"].index(su_cur),
                                   key="adjx_site_unit")
     with s2:
         site_rate_val = st.number_input("Rate ($)", min_value=0, value=int(_ag("site_rate")), step=1, key="adj_site_rate", format="%d")
 
     st.divider()
-
-    # ── Time / market conditions ──────────────────────────────────────────────
     st.markdown("#### Time / Market Conditions")
     t1, t2, t3 = st.columns(3)
     with t1:
@@ -2243,169 +2225,130 @@ with tab6:
     with t2:
         time_rate_val = st.number_input("Rate (% per month)", min_value=0.0, value=float(_ag("time_rate")), step=0.1, format="%.2f", key="adj_time_rate")
     with t3:
-        _td_opts = ["Appreciating", "Declining"]
-        _td_cur  = str(_ag("time_dir"))
-        _td_idx  = _td_opts.index(_td_cur) if _td_cur in _td_opts else 0
-        time_dir = st.selectbox("Direction", _td_opts, index=_td_idx, key="adj_time_dir")
+        td_opts = ["Appreciating", "Declining"]
+        td_cur = str(_ag("time_dir"))
+        td_idx = td_opts.index(td_cur) if td_cur in td_opts else 0
+        time_dir = st.selectbox("Direction", td_opts, index=td_idx, key="adj_time_dir")
 
     st.divider()
-
-    # ── Location & view ───────────────────────────────────────────────────────
     st.markdown("#### Location & View Adjustments")
     st.caption("Rates as % of sale price.")
     lv1, lv2, lv3, lv4 = st.columns(4)
     with lv1:
-        adv_loc_val  = st.number_input("Adverse Location (%)", min_value=0.0, value=float(_ag("adv_loc")), step=0.5, format="%.1f", key="adj_adv_loc")
-        use_adv_loc  = st.checkbox("Include Adverse Location", key="adjx_use_adv_loc")
+        adv_loc_val = st.number_input("Adverse Location (%)", min_value=0.0, value=float(_ag("adv_loc")), step=0.5, format="%.1f", key="adj_adv_loc")
+        use_adv_loc = st.checkbox("Include Adverse Location", key="adjx_use_adv_loc")
     with lv2:
-        ben_loc_val  = st.number_input("Beneficial Location (%)", min_value=0.0, value=float(_ag("ben_loc")), step=0.5, format="%.1f", key="adj_ben_loc")
-        use_ben_loc  = st.checkbox("Include Beneficial Location", key="adjx_use_ben_loc")
+        ben_loc_val = st.number_input("Beneficial Location (%)", min_value=0.0, value=float(_ag("ben_loc")), step=0.5, format="%.1f", key="adj_ben_loc")
+        use_ben_loc = st.checkbox("Include Beneficial Location", key="adjx_use_ben_loc")
     with lv3:
         adv_view_val = st.number_input("Adverse View (%)", min_value=0.0, value=float(_ag("adv_view")), step=0.5, format="%.1f", key="adj_adv_view")
         use_adv_view = st.checkbox("Include Adverse View", key="adjx_use_adv_view")
-        adv_view_type = st.text_input("View description", placeholder="e.g. highway, commercial", key="adjx_adv_view_type")
+        adv_view_type = st.text_input("Adverse view description", placeholder="e.g. highway, commercial", key="adjx_adv_view_type")
     with lv4:
         ben_view_val = st.number_input("Beneficial View (%)", min_value=0.0, value=float(_ag("ben_view")), step=0.5, format="%.1f", key="adj_ben_view")
         use_ben_view = st.checkbox("Include Beneficial View", key="adjx_use_ben_view")
-        ben_view_type = st.text_input("View description (beneficial)", placeholder="e.g. water, golf, wooded", key="adjx_ben_view_type")
+        ben_view_type = st.text_input("Beneficial view description", placeholder="e.g. water, golf, wooded", key="adjx_ben_view_type")
 
     st.divider()
-
-    # ── Condition adjustments ─────────────────────────────────────────────────
     st.markdown("#### Condition Adjustments")
-    _comp_nums = ["1","2","3","4","5","6"]
+    cn = ["1","2","3","4","5","6"]
     cc1, cc2 = st.columns(2)
     with cc1:
         st.markdown("**Superior interior condition (per MLS)**")
-        sup_cond = st.multiselect("Sup cond", _comp_nums, default=["2","4"],
-                                   format_func=lambda x: f"Comp {x}",
-                                   key="adjx_sup_cond", label_visibility="collapsed")
+        sup_cond = st.multiselect("Sup cond", cn, default=["2","4"], format_func=lambda x: "Comp " + x, key="adjx_sup_cond", label_visibility="collapsed")
     with cc2:
         st.markdown("**Inferior interior condition (per MLS)**")
-        inf_cond = st.multiselect("Inf cond", _comp_nums,
-                                   format_func=lambda x: f"Comp {x}",
-                                   key="adjx_inf_cond", label_visibility="collapsed")
+        inf_cond = st.multiselect("Inf cond", cn, format_func=lambda x: "Comp " + x, key="adjx_inf_cond", label_visibility="collapsed")
 
     st.divider()
-
-    # ── Quality adjustments ───────────────────────────────────────────────────
     st.markdown("#### Quality Adjustments")
     qq1, qq2 = st.columns(2)
     with qq1:
         st.markdown("**Superior quality**")
-        sup_qual = st.multiselect("Sup qual", _comp_nums,
-                                   format_func=lambda x: f"Comp {x}",
-                                   key="adjx_sup_qual", label_visibility="collapsed")
+        sup_qual = st.multiselect("Sup qual", cn, format_func=lambda x: "Comp " + x, key="adjx_sup_qual", label_visibility="collapsed")
     with qq2:
         st.markdown("**Inferior quality**")
-        inf_qual = st.multiselect("Inf qual", _comp_nums,
-                                   format_func=lambda x: f"Comp {x}",
-                                   key="adjx_inf_qual", label_visibility="collapsed")
+        inf_qual = st.multiselect("Inf qual", cn, format_func=lambda x: "Comp " + x, key="adjx_inf_qual", label_visibility="collapsed")
 
     st.divider()
-
-    # ── Disclosure options ────────────────────────────────────────────────────
     st.markdown("#### Disclosure Options")
     d1, d2, d3, d4 = st.columns(4)
     with d1:
-        ext_search  = st.checkbox("Extended search beyond 6 months", value=True, key="adjx_ext_search")
+        ext_search = st.checkbox("Extended search beyond 6 months", value=True, key="adjx_ext_search")
     with d2:
-        geo_expand  = st.checkbox("Geographic search expansion", key="adjx_geo_expand")
+        geo_expand = st.checkbox("Geographic search expansion", key="adjx_geo_expand")
     with d3:
         arms_length = st.checkbox("Arms-length transaction note", key="adjx_arms_length")
     with d4:
-        prior_sale  = st.checkbox("Prior sale research note (USPAP)", key="adjx_prior_sale")
-    d5, _ = st.columns(2)
+        prior_sale = st.checkbox("Prior sale research note (USPAP)", key="adjx_prior_sale")
+    d5, d6 = st.columns(2)
     with d5:
-        val_rounded = st.checkbox("Final value — within range, rounded", value=True, key="adjx_val_rounded")
+        val_rounded = st.checkbox("Final value within range, rounded", value=True, key="adjx_val_rounded")
 
     st.divider()
-
-    # ── Generate ──────────────────────────────────────────────────────────────
-    if st.button("⚡ Generate Paragraph", use_container_width=True, key="adj_generate"):
-        def _fd(n):
-            return f"${int(n):,}"
-        def _fp(n):
-            return f"{float(n):g}%"
-        def _cl(vals):
+    if st.button("Generate Paragraph", use_container_width=True, key="adj_generate"):
+        def fd(n): return "$" + "{:,}".format(int(n))
+        def fp(n): return "{:g}%".format(float(n))
+        def cl(vals):
             if not vals: return ""
-            refs = [f"#{v}" for v in vals]
-            if len(refs) == 1: return f"Sale {refs[0]}"
+            refs = ["#" + v for v in vals]
+            if len(refs) == 1: return "Sale " + refs[0]
             return "Sales " + ", ".join(refs[:-1]) + " & " + refs[-1]
 
         parts = []
-        if int(gla_val) > 0:        parts.append(f"{_fd(gla_val)} per SF GLA over 50 SF")
-        if bed_in_gla:               parts.append("Bedroom adj reflected in GLA")
-        elif int(bed_val) > 0:       parts.append(f"Bedrooms @ {_fd(bed_val)}")
-        if int(fb_val) > 0:          parts.append(f"Full Bath @ {_fd(fb_val)}")
-        if int(hb_val) > 0:          parts.append(f"Half Bath @ {_fd(hb_val)}")
-        if int(bas_val) > 0:         parts.append(f"Basement @ {_fd(bas_val)}")
-        if int(gar_val) > 0:         parts.append(f"Garage @ {_fd(gar_val)} per stall")
-        if int(enc_val) > 0:         parts.append(f"Enclosed Porch @ {_fd(enc_val)}")
-        if int(deck_val) > 0:        parts.append(f"Deck/Open Porch/Patio @ {_fd(deck_val)} each")
-        if int(fp_val) > 0:          parts.append(f"Fireplace/Woodstove @ {_fd(fp_val)} each")
-        if int(bgr_val) > 0:         parts.append(f"Below-grade rooms @ {_fd(bgr_val)} each")
-        if use_pool and int(pool_val) > 0:       parts.append(f"In-ground pool @ {_fd(pool_val)}")
-        if use_cac and int(cac_val) > 0:         parts.append(f"Central AC @ {_fd(cac_val)}")
-        if use_solar and int(solar_val) > 0:     parts.append(f"Solar @ {_fd(solar_val)}")
-        if use_adu and int(adu_val) > 0:         parts.append(f"ADU @ {_fd(adu_val)}")
-        if use_outbldg and int(outbldg_val) > 0: parts.append(f"Out building @ {_fd(outbldg_val)}")
+        if int(gla_val) > 0: parts.append(fd(gla_val) + " per SF GLA over 50 SF")
+        if bed_in_gla: parts.append("Bedroom adj reflected in GLA")
+        elif int(bed_val) > 0: parts.append("Bedrooms @ " + fd(bed_val))
+        if int(fb_val) > 0: parts.append("Full Bath @ " + fd(fb_val))
+        if int(hb_val) > 0: parts.append("Half Bath @ " + fd(hb_val))
+        if int(bas_val) > 0: parts.append("Basement @ " + fd(bas_val))
+        if int(gar_val) > 0: parts.append("Garage @ " + fd(gar_val) + " per stall")
+        if int(enc_val) > 0: parts.append("Enclosed Porch @ " + fd(enc_val))
+        if int(deck_val) > 0: parts.append("Deck/Open Porch/Patio @ " + fd(deck_val) + " each")
+        if int(fp_val) > 0: parts.append("Fireplace/Woodstove @ " + fd(fp_val) + " each")
+        if int(bgr_val) > 0: parts.append("Below-grade rooms @ " + fd(bgr_val) + " each")
+        if use_pool and int(pool_val) > 0: parts.append("In-ground pool @ " + fd(pool_val))
+        if use_cac and int(cac_val) > 0: parts.append("Central AC @ " + fd(cac_val))
+        if use_solar and int(solar_val) > 0: parts.append("Solar @ " + fd(solar_val))
+        if use_adu and int(adu_val) > 0: parts.append("ADU @ " + fd(adu_val))
+        if use_outbldg and int(outbldg_val) > 0: parts.append("Out building @ " + fd(outbldg_val))
 
         adj_s = ("Adjustments made: " + "; ".join(parts) + ".") if parts else ""
-
         site_s = ""
         if site_unit == "Per SF" and int(site_rate_val) > 0:
-            site_s = f" Site size adjustments were applied at {_fd(site_rate_val)} per SF."
+            site_s = " Site size adjustments were applied at " + fd(site_rate_val) + " per SF."
         elif site_unit == "Per acre" and int(site_rate_val) > 0:
-            site_s = f" Site size adjustments were applied at {_fd(site_rate_val)} per acre."
-
+            site_s = " Site size adjustments were applied at " + fd(site_rate_val) + " per acre."
         time_s = ""
         if use_time and float(time_rate_val) > 0:
-            time_s = (f" A time adjustment of {_fp(time_rate_val)} per month was applied to comparables "
-                      f"to reflect {time_dir.lower()} market conditions over the search period.")
-
+            time_s = " A time adjustment of " + fp(time_rate_val) + " per month was applied to comparables to reflect " + time_dir.lower() + " market conditions over the search period."
         lv_parts = []
-        if use_adv_loc and float(adv_loc_val) > 0:
-            lv_parts.append(f"adverse location ({_fp(adv_loc_val)})")
-        if use_ben_loc and float(ben_loc_val) > 0:
-            lv_parts.append(f"beneficial location ({_fp(ben_loc_val)})")
+        if use_adv_loc and float(adv_loc_val) > 0: lv_parts.append("adverse location (" + fp(adv_loc_val) + ")")
+        if use_ben_loc and float(ben_loc_val) > 0: lv_parts.append("beneficial location (" + fp(ben_loc_val) + ")")
         if use_adv_view and float(adv_view_val) > 0:
-            _desc = f" — {adv_view_type.strip()}" if adv_view_type.strip() else ""
-            lv_parts.append(f"adverse view{_desc} ({_fp(adv_view_val)})")
+            desc = " — " + adv_view_type.strip() if adv_view_type.strip() else ""
+            lv_parts.append("adverse view" + desc + " (" + fp(adv_view_val) + ")")
         if use_ben_view and float(ben_view_val) > 0:
-            _desc = f" — {ben_view_type.strip()}" if ben_view_type.strip() else ""
-            lv_parts.append(f"beneficial view{_desc} ({_fp(ben_view_val)})")
+            desc = " — " + ben_view_type.strip() if ben_view_type.strip() else ""
+            lv_parts.append("beneficial view" + desc + " (" + fp(ben_view_val) + ")")
         lv_s = (" Location and view adjustments applied for: " + "; ".join(lv_parts) + ".") if lv_parts else ""
-
         cond_s = ""
-        if sup_cond:
-            cond_s += f" Comparable {_cl(sup_cond)} received condition adjustment{'s' if len(sup_cond)>1 else ''} due to superior interior condition, per MLS."
-        if inf_cond:
-            cond_s += f" Comparable {_cl(inf_cond)} received condition adjustment{'s' if len(inf_cond)>1 else ''} due to inferior interior condition, per MLS."
-
+        if sup_cond: cond_s += " Comparable " + cl(sup_cond) + " received condition adjustment" + ("s" if len(sup_cond) > 1 else "") + " due to superior interior condition, per MLS."
+        if inf_cond: cond_s += " Comparable " + cl(inf_cond) + " received condition adjustment" + ("s" if len(inf_cond) > 1 else "") + " due to inferior interior condition, per MLS."
         qual_s = ""
-        if sup_qual:
-            qual_s += f" Comparable {_cl(sup_qual)} received quality adjustment{'s' if len(sup_qual)>1 else ''} due to superior overall quality relative to the subject."
-        if inf_qual:
-            qual_s += f" Comparable {_cl(inf_qual)} received quality adjustment{'s' if len(inf_qual)>1 else ''} due to inferior overall quality relative to the subject."
-
-        ext_s   = " Due to a lack of sales with similar style, age, and location, it was necessary to extend the search beyond six months." if ext_search else ""
-        geo_s   = " Due to limited availability of comparable sales within the immediate neighborhood, the geographic search area was expanded to include competing neighborhoods and adjacent communities." if geo_expand else ""
-        arms_s  = " All comparable sales have been verified as arm's-length transactions. Any non-arm's-length transactions identified were excluded from consideration." if arms_length else ""
+        if sup_qual: qual_s += " Comparable " + cl(sup_qual) + " received quality adjustment" + ("s" if len(sup_qual) > 1 else "") + " due to superior overall quality relative to the subject."
+        if inf_qual: qual_s += " Comparable " + cl(inf_qual) + " received quality adjustment" + ("s" if len(inf_qual) > 1 else "") + " due to inferior overall quality relative to the subject."
+        ext_s = " Due to a lack of sales with similar style, age, and location, it was necessary to extend the search beyond six months." if ext_search else ""
+        geo_s = " Due to limited availability of comparable sales within the immediate neighborhood, the geographic search area was expanded to include competing neighborhoods and adjacent communities." if geo_expand else ""
+        arms_s = " All comparable sales have been verified as arm's-length transactions. Any non-arm's-length transactions identified were excluded from consideration." if arms_length else ""
         prior_s = " A search of public records revealed no prior sales or transfers of the subject property within the three-year period prior to the effective date, unless otherwise noted in this report." if prior_sale else ""
         round_s = " The final opinion of value is within the indicated range, rounded." if val_rounded else ""
-
-        intro = ("The appraiser has verified each sale with MLS data and city records. "
-                 "Photos of the exterior of the comparables are included in the report. "
-                 "If a photo of the comparable was not possible or not permitted by the homeowner, "
-                 "a recent MLS or city photo was included.")
-
+        intro = "The appraiser has verified each sale with MLS data and city records. Photos of the exterior of the comparables are included in the report. If a photo of the comparable was not possible or not permitted by the homeowner, a recent MLS or city photo was included."
         full = (intro + " " + adj_s + site_s + time_s + lv_s + cond_s + qual_s + ext_s + geo_s + arms_s + prior_s + round_s).strip()
         st.session_state["adj_output"] = full
 
-    # ── Output ────────────────────────────────────────────────────────────────
     if st.session_state.get("adj_output"):
         out = st.session_state["adj_output"]
-        st.markdown(f"**Generated Paragraph** — {len(out):,} characters")
+        st.markdown("**Generated Paragraph** — " + str(len(out)) + " characters")
         st.text_area("Paragraph output", value=out, height=220, key="adj_out_display", label_visibility="collapsed")
-        st.caption("💡 Click in the box · Ctrl+A · Ctrl+C to copy.")
+        st.caption("Click in the box, Ctrl+A, Ctrl+C to copy.")
