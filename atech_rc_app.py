@@ -606,12 +606,12 @@ st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "🔧 Adj. Commentary",
+    "🏘️ Neighborhoods",
     "📐 Zoning",
     "📝 Comments",
     "✅ QC Checker",
     "📋 Revisions",
-    "🏘️ Neighborhoods",
+    "🔧 Adj. Commentary",
     "🆕 UAD 3.6",
 ])
 
@@ -786,7 +786,7 @@ with tab3:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — NEIGHBORHOOD DESCRIPTIONS
 # ══════════════════════════════════════════════════════════════════════════════
-with tab6:
+with tab1:
  if True:
     neighborhoods = load_neighborhoods()
 
@@ -1432,7 +1432,6 @@ with tab4:
 
     if not qc_xml:
         st.info("Upload a TOTAL XML export to run QC checks.")
-        st.stop()
 
     # ── Parse XML ─────────────────────────────────────────────────────────
     @st.cache_data(show_spinner="Parsing XML...")
@@ -2067,7 +2066,7 @@ with tab4:
 # ═══════════════════════════════════════════════════════════════════
 # TAB 6 — ADJUSTMENT COMMENTARY GENERATOR
 # ═══════════════════════════════════════════════════════════════════
-with tab1:
+with tab6:
  if True:
     st.subheader("Adjustment Commentary Generator")
     st.caption("Configure rates, select items, and generate paste-ready addendum language.")
