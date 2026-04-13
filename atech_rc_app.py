@@ -1102,8 +1102,8 @@ with tab2:
                     display_output = zone.get("total_override") or auto_output
 
                     if st.session_state.get("zone_admin"):
-                        edited = st.text_area("", value=display_output, height=75,
-                                              key=f"total_{zone['id']}")
+                        edited = st.text_area("TOTAL quicklist text", value=display_output, height=75,
+                                              key=f"total_{zone['id']}", label_visibility="collapsed")
                         ta1, ta2 = st.columns(2)
                         with ta1:
                             if st.button("💾 Save TOTAL Text", key=f"save_total_{zone['id']}",
@@ -1121,8 +1121,8 @@ with tab2:
                                 save_zoning(zoning)
                                 st.rerun()
                     else:
-                        st.text_area("", value=display_output, height=75,
-                                     key=f"total_{zone['id']}", disabled=True)
+                        st.text_area("TOTAL quicklist text", value=display_output, height=75,
+                                     key=f"total_{zone['id']}", disabled=True, label_visibility="collapsed")
                         st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
                     st.divider()
