@@ -748,7 +748,7 @@ with tab5:
                 "Copy the text below:",
                 value=caps(rev.get("response","")),
                 height=160,
-                key=f"rev_text_{rev['id']}"
+                key=f"rev_text_{rev['id']}_{st.session_state.get('all_caps',False)}"
             )
             if rev.get("notes"):
                 st.caption(f"📝 Note: {rev['notes']}")
@@ -827,7 +827,7 @@ with tab3:
                 "Copy the text below:",
                 value=caps(com.get("text","")),
                 height=160,
-                key=f"com_text_{com['id']}"
+                key=f"com_text_{com['id']}_{st.session_state.get('all_caps',False)}"
             )
             if com.get("notes"):
                 st.caption(f"📝 Note: {com['notes']}")
@@ -912,7 +912,7 @@ with tab1:
                     "Neighborhood description",
                     value=caps(hood.get("description","")),
                     height=160,
-                    key=f"hood_text_{hood['id']}",
+                    key=f"hood_text_{hood['id']}_{st.session_state.get('all_caps',False)}",
                     disabled=not st.session_state.get("site_admin", False),
                     label_visibility="collapsed"
                 )
@@ -1117,7 +1117,7 @@ with tab2:
 
                     if st.session_state.get("site_admin"):
                         edited = st.text_area("TOTAL quicklist text", value=caps(display_output), height=75,
-                                              key=f"total_{zone['id']}", label_visibility="collapsed")
+                                              key=f"total_{zone['id']}_{st.session_state.get('all_caps',False)}", label_visibility="collapsed")
                         ta1, ta2 = st.columns(2)
                         with ta1:
                             if st.button("💾 Save TOTAL Text", key=f"save_total_{zone['id']}",
@@ -1136,7 +1136,7 @@ with tab2:
                                 st.rerun()
                     else:
                         st.text_area("TOTAL quicklist text", value=caps(display_output), height=75,
-                                     key=f"total_{zone['id']}", disabled=True, label_visibility="collapsed")
+                                     key=f"total_{zone['id']}_{st.session_state.get('all_caps',False)}", disabled=True, label_visibility="collapsed")
                         st.caption("☝️ Click · Ctrl+A · Ctrl+C")
 
                     st.divider()
@@ -2342,5 +2342,5 @@ with tab6:
     if st.session_state.get("adj_output"):
         out = st.session_state["adj_output"]
         st.markdown("**Generated Paragraph** — " + str(len(out)) + " characters")
-        st.text_area("Paragraph output", value=caps(out), height=220, key="adj_out_display", label_visibility="collapsed")
+        st.text_area("Paragraph output", value=caps(out), height=220, key=f"adj_out_display_{st.session_state.get('all_caps',False)}", label_visibility="collapsed")
         st.caption("Click in the box, Ctrl+A, Ctrl+C to copy.")
