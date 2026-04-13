@@ -2502,5 +2502,5 @@ with tab7:
         output_text = st.session_state["adj_output"]
         char_count = len(output_text)
         st.markdown(f"**Generated Paragraph** — {char_count:,} characters")
-        st.text_area("Copy and paste into TOTAL:", value=output_text, height=220, key="adj_output_display")
+        st.text_area("Generated paragraph:", value=output_text, height=220, key="adj_output_display", label_visibility="collapsed")
         st.caption("💡 Select all text in the box above (Ctrl+A / Cmd+A) then copy.")
