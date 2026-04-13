@@ -606,12 +606,12 @@ st.divider()
 
 # ── Top Navigation ────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "🏘️ Neighborhoods",
+    "🔧 Adj. Commentary",
     "📐 Zoning",
     "📝 Comments",
     "✅ QC Checker",
     "📋 Revisions",
-    "🔧 Adj. Commentary",
+    "🏘️ Neighborhoods",
     "🆕 UAD 3.6",
 ])
 
@@ -786,7 +786,7 @@ with tab3:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — NEIGHBORHOOD DESCRIPTIONS
 # ══════════════════════════════════════════════════════════════════════════════
-with tab1:
+with tab6:
  if True:
     neighborhoods = load_neighborhoods()
 
@@ -2067,7 +2067,7 @@ with tab4:
 # ═══════════════════════════════════════════════════════════════════
 # TAB 6 — ADJUSTMENT COMMENTARY GENERATOR
 # ═══════════════════════════════════════════════════════════════════
-with tab6:
+with tab1:
  if True:
     st.subheader("Adjustment Commentary Generator")
     st.caption("Configure rates, select items, and generate paste-ready addendum language.")
