@@ -875,11 +875,12 @@ with tab1:
             label = f"🏘️ {_city}" if _hood == _city or _hood in ("General", _city) else f"🏘️ {_city} — {_hood}"
             with st.expander(label):
                 st.text_area(
-                    "",
+                    "Neighborhood description",
                     value=hood.get("description",""),
                     height=160,
                     key=f"hood_text_{hood['id']}",
-                    disabled=not st.session_state.get("hood_admin", False)
+                    disabled=not st.session_state.get("hood_admin", False),
+                    label_visibility="collapsed"
                 )
                 if hood.get("notes"):
                     st.caption(f"📝 Note: {hood['notes']}")
