@@ -2065,6 +2065,6 @@ with tab4:
                 st.success(f"**{p['cat']}:** {p['msg']}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 7 — TEST
 with tab7:
+ if True:
     st.write("TAB 7 IS WORKING")
