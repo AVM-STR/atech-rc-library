@@ -1,0 +1,218 @@
+[
+  {
+    "id": "c1",
+    "category": "Land Condo \u2014 Classification and Market Perception",
+    "text": "A land condominium is a form of ownership in which the unit owner holds fee simple title to the land beneath their home (the 'unit'), while certain common elements \u2014 such as roads, utilities, or shared open space \u2014 are owned collectively by the association. Unlike a traditional condominium, the land condo owner holds direct ownership of the land, and the structure is treated in a manner consistent with single-family ownership for appraisal and lending purposes. In the subject's market area, land condominiums are generally perceived by buyers and sellers as functionally equivalent to fee simple single-family homes. The market does not demonstrate a measurable valuation differential between land condo and fee simple single-family properties in this neighborhood.",
+    "notes": "Verify that your comparable sales are also land condos where possible."
+  },
+  {
+    "id": "c2",
+    "category": "Concession Adjustments \u2014 Adjusted at Cash Value",
+    "text": "It would appear from the analysis of the market that concessions of 0-4% are typical within the subject's marketing area. There is not a prevalence of loan discounts, interest buy-downs and/or concessions which would have a negative impact on the subject property's market value, unless otherwise stated in the report. However, the appraiser has assessed adjustments to comparables in an effort to demonstrate a cash basis for adjusted value.",
+    "notes": "Use when concessions are present but not excessive."
+  },
+  {
+    "id": "c3",
+    "category": "Concession Adjustments \u2014 Adjusted Only When Excessive",
+    "text": "The analysis of the average concessions package for homes within the sample used to determine market trends indicates a range of approximately X-X%. There is no prevalent use of loan discounts, interest rate buy-downs, or concessions that would negatively impact the subject property's market value unless otherwise stated in the report. Consequently, the appraiser has applied adjustments to comparables only when they exceed the typical threshold for the overall market.",
+    "notes": "Use when concessions exist but are not being adjusted on every comp."
+  },
+  {
+    "id": "c4",
+    "category": "Chain of Title",
+    "text": "The appraiser has conducted a thorough search of the subject property and comparables to determine the chain of title and the number of transfers for each home. All available and customary data sources were utilized to obtain this information, including MLS, CompFlo deeds, Realist tax, and public record. However, it should be noted that data in this area can sometimes be unreliable, particularly for recent transfers. While every effort was made to identify all transfers, it is not guaranteed that every transaction was captured. The purpose of the appraiser's chain of title examination is to alert the client to any potentially compromised comparables or non-arm's length transactions.",
+    "notes": "Update data sources to match your actual sources."
+  },
+  {
+    "id": "c5",
+    "category": "Comparable Selection Criteria",
+    "text": "In searching for comparables, the appraiser has emphasized location, lot size, gross living area, utility, design, age, and condition, with specific emphasis on sales that closed within 180 days prior to the effective date. In most cases, comparables older than six months have been eliminated from consideration. In cases where the appraiser could not locate recent sales within the immediate area, a representative sample of homes from both the subject neighborhood and competing areas was utilized. Sales that may represent outlier events have been carefully scrutinized and eliminated from consideration when appropriate.",
+    "notes": ""
+  },
+  {
+    "id": "c6",
+    "category": "Highest and Best Use",
+    "text": "The relevant legal, physical, and economic factors were analyzed to the extent necessary and resulted in a conclusion that the current use of the subject property is the highest and best use [USPAP \u2014 Standards Rule 2-2(b)(x)].",
+    "notes": ""
+  },
+  {
+    "id": "c7",
+    "category": "Condition/Quality Adjustments \u2014 General",
+    "text": "It should be noted that the appraiser considered numerous sales within the defined neighborhood reflecting various states of condition. In comparable selection the appraiser made a concentrated effort to locate and select homes similar in terms of physical characteristics and condition. The appraiser assessed features and condition through the use of MLS listings, interior photos (when available), and exterior inspections. Any condition/quality adjustments assessed are based on the appraiser's assessment of contributory value via paired sales analysis. Unless otherwise noted the appraiser has applied equal emphasis to all comparable sales.",
+    "notes": ""
+  },
+  {
+    "id": "c8",
+    "category": "Condition/Quality Adjustments \u2014 UAD Requirements",
+    "text": "UAD requirements mandate that condition and quality ratings be reported on an 'absolute' basis rather than a 'relative' basis. Consequently, in some cases the appraiser will make adjustments to comparables that share the same UAD condition or quality rating due to minor differences in overall condition or quality. The appraiser assessed features and condition through the use of MLS listings, interior photos, and exterior inspections. During the course of research, the appraiser deemed that comparables #[X] and #[X] warrant a similar condition rating but were slightly superior/inferior in terms of overall condition. Consequently, an adjustment of $[X,XXX] has been assigned based on the appraiser's assessment of contributory value via paired sales analysis.",
+    "notes": "Fill in comparable numbers and adjustment amount."
+  },
+  {
+    "id": "c9",
+    "category": "Active Listing/Pending Sale \u2014 Multiple",
+    "text": "Comparables #[X] and #[X] are active listings/pending sales and were included to demonstrate current market activity within the subject's marketing area. A conservative [X]% adjustment was assessed to the active listings in an effort to compensate for the typical differential between list price and sales price.",
+    "notes": "Typically 5-10% depending on market."
+  },
+  {
+    "id": "c10",
+    "category": "Active Listing/Pending Sale \u2014 Single (with explanation)",
+    "text": "Comparable #[X] is an active listing/pending sale and was included to demonstrate current market activity within the subject's marketing area. A conservative [X]% adjustment was assessed in an effort to compensate for the typical differential between list price and sales price. Please note that the appraiser conducted an exhaustive search for an additional listing competitive to the subject; however, none similar in terms of age, GLA, and condition were available as of the effective date.",
+    "notes": ""
+  },
+  {
+    "id": "c11",
+    "category": "Predominant Value \u2014 Appraised Value Exceeds Predominant",
+    "text": "The predominant value as stated on page 1 of this appraisal is approximately $[X]; however, this range applies to the subject's immediate marketing area as a whole. Homes within this range are considered to be inferior in terms of GLA, age, quality of construction, appeal, and utility. Consequently the appraised value exceeds the predominant value. The home is not considered to be over-improved for the marketing area.",
+    "notes": ""
+  },
+  {
+    "id": "c12",
+    "category": "Effective Age \u2014 Less Than Actual Age",
+    "text": "Please note that it is the opinion of the appraiser that the effective age is less than the actual age of the subject property. This assertion is predicated on the fact that the subject has been well-maintained and that the home's true age does not reflect the general upkeep performed over its lifetime. Although the home does show general wear and tear consistent with its age, its effective age has been estimated at [X] years.",
+    "notes": "Fill in the estimated effective age."
+  },
+  {
+    "id": "c13",
+    "category": "GLA \u2014 Differs from Public Record (>10%)",
+    "text": "Please note that the GLA for the subject may differ from public record by more than 10%. The measurements indicated within this report are considered to be highly accurate. Differentials of this nature are not uncommon and are attributed to inaccuracies within the public record data. Discrepancies commonly occur when municipalities include basement or unfinished attic area in the reported GLA figure.",
+    "notes": ""
+  },
+  {
+    "id": "c14",
+    "category": "GLA \u2014 Differential Exceeds 20% Preferred Guideline",
+    "text": "Please note that the GLA differential for some comparables exceeds the preferred 20% guideline. This is attributed to the complexity of comparable selection and the limited availability of recent comparable sales similar in terms of GLA. Consequently, the appraiser was required to utilize homes that were inferior/superior in terms of GLA and has applied the necessary adjustments accordingly.",
+    "notes": ""
+  },
+  {
+    "id": "c15",
+    "category": "GLA \u2014 Subject Inferior to All Comparables",
+    "text": "Please note that the subject is inferior in terms of GLA to all comparables utilized. The appraiser conducted an exhaustive search for recent comparables similar or superior in terms of GLA; however, very few that could be considered similar in terms of age and condition were available at the time of inspection. The subject is not considered to be inadequate for its marketing area.",
+    "notes": ""
+  },
+  {
+    "id": "c16",
+    "category": "GLA \u2014 Subject Superior to All Comparables",
+    "text": "Please note that the subject is superior in terms of GLA to all comparables utilized. The appraiser conducted an exhaustive search for recent comparables similar in terms of GLA; however, very few that could be considered similar in terms of age and condition were available. The subject is not considered to be over-improved for its marketing area.",
+    "notes": ""
+  },
+  {
+    "id": "c17",
+    "category": "GLA \u2014 Split Level Threshold Method",
+    "text": "Please note that the subject is a split-level home. For the purposes of this appraisal the appraiser has utilized the 'threshold method of entry' to report GLA and basement areas. This entails reporting 'below grade' area as all finished/unfinished area below the threshold of the front door. This method is applied consistently across all comparables. Within this market, tax records tend to be inconsistent when reporting physical characteristics for split-level homes.",
+    "notes": ""
+  },
+  {
+    "id": "c18",
+    "category": "Net/Gross Adjustments Exceed 15%/25%",
+    "text": "Please note that some comparables exceed the preferred guidelines of 15% and/or 25% for net and/or gross adjustment percentages respectively. This can be attributed to the complexity of comparable selection and the limited number of recent available comparable sales. The subject's floor plan, GLA, and lot size in conjunction with age made it necessary to utilize a variety of homes to 'bracket' the market's reaction for each contributory characteristic.",
+    "notes": ""
+  },
+  {
+    "id": "c19",
+    "category": "Line Item Adjustments Exceed 10%",
+    "text": "Please note that single line item adjustments for some comparables exceed the preferred 10% guideline. This can be attributed to the complexity of comparable selection and the limited number of recent available comparable sales. The subject's floor plan, GLA, and lot size in conjunction with age made it necessary to utilize a variety of homes to 'bracket' the market's reaction for each contributory characteristic.",
+    "notes": ""
+  },
+  {
+    "id": "c20",
+    "category": "Land Value Exceeds 30%",
+    "text": "Please note that land value for the subject exceeds 30% of indicated market value. This can be attributed to the limited availability of vacant land for development within the subject's defined neighborhood and the enhanced marketability associated with the subject's location. This is considered typical for the subject's marketing area.",
+    "notes": "Common in coastal RI markets. Pair with land sales data when possible."
+  },
+  {
+    "id": "c21",
+    "category": "Pool \u2014 In-Ground Pool Adjustment",
+    "text": "Please note that the subject has an in-ground pool. Within this market, pools are considered to affect marketability in a positive manner. Consequently an adjustment of $[XX,XXX] was assessed to all comparables without pools in an effort to compensate for the enhanced marketability considered to be inherent in such a feature.",
+    "notes": "Fill in the dollar adjustment. Support with paired sales if challenged."
+  },
+  {
+    "id": "c22",
+    "category": "Waterfront / River Lot",
+    "text": "Please note that the subject is situated on a waterfront/river-front lot. Within this market, the subject's lot influence represents a significant, positive component of the subject's marketability and appeals to a specific pool of buyers. The appraiser made a concentrated effort to locate and/or utilize homes similar in terms of lot influence. The appraiser has assessed a $[XX,000] adjustment to all comparables not situated on a lot with a similar external influence in an effort to compensate for the enhanced marketability.",
+    "notes": "Especially relevant for Narragansett, coastal RI, and waterfront MA assignments."
+  },
+  {
+    "id": "c23",
+    "category": "Acreage / Large Lot",
+    "text": "Please note that the subject is situated on approximately [XX] acres. Within this market, the subject's lot size represents a significant, positive component of the subject's marketability. Per MLS, vacant land sales and listings within the subject's defined neighborhood are selling/listing from $[X] to $[X] per acre. The appraiser has adjusted conservatively at $[X] per acre to compensate for the subject's lot size.",
+    "notes": "Fill in acreage and per-acre values from land sales."
+  },
+  {
+    "id": "c24",
+    "category": "External Obsolescence \u2014 High Traffic Street",
+    "text": "Please note that the subject suffers from incurable external obsolescence in the form of close proximity to a moderately high-traffic street. The appraiser conducted an exhaustive search for comparable sales with a similar external influence; however, none were available for review at the time of inspection. The appraiser assessed a $[X,000] adjustment to all comparables that do not share a similar external influence.",
+    "notes": ""
+  },
+  {
+    "id": "c25",
+    "category": "External Obsolescence \u2014 Power Lines",
+    "text": "Please note that the subject suffers from incurable external obsolescence in the form of close proximity to power lines. The appraiser conducted an exhaustive search for comparable sales with a similar external influence; however, none were available for review at the time of inspection. The appraiser assessed a conservative $[X,000] adjustment based on market knowledge, realtor interviews, and historical sales data.",
+    "notes": ""
+  },
+  {
+    "id": "c26",
+    "category": "Flood Zone \u2014 Portion of Lot in 100-Year Flood Plain",
+    "text": "A portion of the subject property appears to lie within the 100-year flood plain; however, improvements do not appear to lie within the flood zone. The appraiser is not an expert in this field and recommends that a flood certification be obtained to more specifically determine the subject's position relative to the flood zone.",
+    "notes": "Add adjustment language if a flood zone adjustment was made."
+  },
+  {
+    "id": "c27",
+    "category": "Condition Disclaimer \u2014 Not a Home Inspection",
+    "text": "Please note that this appraisal is not a home inspection and the appraiser is not acting as a home inspector. While observing the subject property, the appraiser visually observed areas that were readily accessible. The appraiser is not required to disturb or move obstructions to visibility. The inspection is not technically exhaustive. A formal home inspection for the subject property was not provided to the appraiser. The appraisal report should not be relied upon to disclose any conditions present in the subject property. A professional home inspection is recommended on all property purchase transactions.",
+    "notes": "Include on any assignment with deferred maintenance, C4 or lower, or noted repairs."
+  },
+  {
+    "id": "c28",
+    "category": "C1 \u2014 New Construction",
+    "text": "New Construction (C1): The subject is new construction. Due to the age of the subject, no physical inadequacies were noted at the time of inspection. For the purposes of this appraisal and to establish a basis for comparison, the appraiser has listed the home as 'new' or C1 condition.",
+    "notes": ""
+  },
+  {
+    "id": "c29",
+    "category": "C2 \u2014 Remodeled",
+    "text": "Remodeled (C2): Please note that the subject has recently been subjected to a comprehensive remodel. A detailed list of improvements has been attached to this report. The appraiser noted obvious and readily observable improvements to the property completed in a workmanlike manner. It is the opinion of the appraiser that the noted improvements have brought the home into good marketable condition. The appraiser has listed the home as 'good/remodeled' or C2 condition.",
+    "notes": ""
+  },
+  {
+    "id": "c30",
+    "category": "C3 \u2014 Updated Condition",
+    "text": "Updated Condition (C3): Please note that the subject has been well maintained and has been subjected to a series of recent improvements. The appraiser noted obvious and readily observable improvements completed in a workmanlike manner. The appraiser has listed the subject in 'updated' or C3 condition.",
+    "notes": ""
+  },
+  {
+    "id": "c31",
+    "category": "C4 \u2014 Average Condition",
+    "text": "Average Condition (C4): Please note that the subject has been adequately maintained and is considered to be in average marketable condition. The appraiser noted no recent major renovations and/or improvements to the property within the last [X] years. The appraiser has listed the home as 'average' or C4 condition.",
+    "notes": ""
+  },
+  {
+    "id": "c32",
+    "category": "C5/C6 \u2014 Fair/Poor Condition",
+    "text": "Fair Condition (C5-C6): Please note that the subject is currently in a deteriorated state of condition. An interior inspection revealed that many interior and exterior components indicate that some items may be closer to the end of their useful life than a cursory inspection might reveal. The appraiser has provided a list of repairs that represent what was readily observable at the time of inspection; however, this appraisal is not a home inspection. A professional home inspection is recommended. The property is considered to be in 'fair' or C5 condition.",
+    "notes": ""
+  },
+  {
+    "id": "c33",
+    "category": "Income Approach \u2014 Not Utilized",
+    "text": "Please note that the appraiser has considered the income approach to value for the subject; however, the approach was not feasible due to the limited availability of information regarding rental homes that have recently sold. In order to generate an income approach to value, the appraiser would require access to recently sold rental homes to develop a reliable gross rent multiplier (GRM). The data sources available within the normal course of business do not lend themselves to identifying sufficient arm's-length investment transactions of this type. Consequently, the income approach to value has not been developed.",
+    "notes": ""
+  },
+  {
+    "id": "c34",
+    "category": "Adjustment Factors \u2014 GLA Methodology",
+    "text": "Please note that adjustment factors are based on sales comparison analysis or modified cost approach to determine the contributory value of specific marketability factors for the subject. Regression analysis is not feasible during the normal course of business in this market area as MLS data does not typically provide accurate representations of all relevant physical characteristics. Consequently, adjustment factors are based on paired sales analysis, market extraction, local builder and realtor input, and building cost databases.",
+    "notes": "This language directly addresses regression analysis pushback."
+  },
+  {
+    "id": "c35",
+    "category": "Gross Building Area (GBA) \u2014 Multi-Family Definition",
+    "text": "Exterior measurements of a two-to-four family building are used to calculate the Gross Building Area (GBA). Interior finished space, including below-grade living space, interior stairways, hallways, storage rooms, and laundry rooms are part of the GBA. Exterior stairways are not included. Due to the subject's multi-family status, the total rentable area is calculated as GBA. Consequently the below-grade area has been included in the GBA.",
+    "notes": "Use on all 2-4 family assignments."
+  },
+  {
+    "id": "c36",
+    "category": "Scope of Work \u2014 Conventional",
+    "text": "In conducting this appraisal assignment, the appraiser first collected preliminary public record data and made an initial search of available market sales, trends, and influences. A physical inspection of the subject property was made in accordance with the information requirements of the URAR format. The appraiser is not an expert in matters of pest control, structural engineering, hazardous waste, survey, or title matters, and no expertise or warranty is implied in these areas.",
+    "notes": ""
+  }
+]

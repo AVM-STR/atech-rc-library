@@ -1,0 +1,30 @@
+[
+  {
+    "id": "r1",
+    "category": "Rental Comp Selection \u2014 Multi-Family vs SFR",
+    "request": "As per the report, subject is 'Multi-Family' however SFR (single family) rental comp #1-3 is used, please verify or comment.",
+    "response": "All rental comparables provided in this report are sourced from multi-family dwellings, not single-family residences. Individual units within multi-family properties are typically marketed and leased on a per-unit basis, and the rental listings utilized reflect individually marketed units from within multi-family buildings. These represent the most recent and relevant market rent data available, as active and recent listings from multi-family properties provide the most accurate reflection of current market rents for the subject's unit type. The rental comparables are considered appropriate and consistent with the subject's property classification.",
+    "notes": ""
+  },
+  {
+    "id": "r2",
+    "category": "Building Official \u2014 Verbal vs Written Documentation",
+    "request": "The lender is asking if the appraiser received anything from the building official that stated that the kitchen needed to be removed so that they can present it to the borrower?",
+    "response": "The appraiser did not receive written documentation from the building official; however, the appraiser contacted the building department directly and was verbally informed of the requirements necessary to bring the property into compliance. The items communicated by the building department were incorporated into the report as subject-to conditions reflecting those requirements.",
+    "notes": "Customize the building department name to match the subject municipality."
+  },
+  {
+    "id": "r3",
+    "category": "Basement Discoloration \u2014 Moisture Observation",
+    "request": "Appraiser to comment on discoloration on concrete basement floors and state whether any moisture or dampness was observed.",
+    "response": "At the time of inspection there were no present areas of moisture or dampness observed. The discoloration noted on the concrete basement floor is consistent with normal aging and does not indicate active moisture intrusion based on the appraiser's visual observation at the time of inspection.",
+    "notes": "If moisture was present, modify accordingly. This is a visual observation disclaimer \u2014 not a structural certification."
+  },
+  {
+    "id": "r4",
+    "category": "Not a PUD \u2014 Client States Subject is a PUD",
+    "request": "Client states the subject is a PUD.",
+    "response": "A Planned Unit Development (PUD) is generally characterized by a homeowners association that holds title to and is responsible for maintaining common areas and amenities, with individual unit owners holding fee simple title to their lots and improvements. The subject property does not meet this definition. [OPTION A \u2014 No HOA: The subject has no homeowners association, common areas, or shared amenities that would indicate a PUD classification.] [OPTION B \u2014 Minor HOA: The subject does carry a nominal HOA fee for common area maintenance; however, this fee structure alone does not constitute a PUD classification. The subject's HOA structure does not rise to that level.] The property has been appropriately classified consistent with its legal description, site ownership, and market perception.",
+    "notes": "Use Option A if no HOA. Use Option B if minor HOA exists. Delete the option that does not apply."
+  }
+]

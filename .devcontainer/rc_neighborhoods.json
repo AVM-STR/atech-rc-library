@@ -1,0 +1,324 @@
+[
+  {
+    "id": "n0",
+    "city": "Barrington",
+    "neighborhood": "Barrington",
+    "description": "Subject is located in Barrington, RI, an established residential community consisting primarily of single-family dwellings with supporting municipal and recreational uses. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood or environmental conditions were observed. Land use designated as \"other\" includes open space, coastal features, and public recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n1",
+    "city": "Bristol",
+    "neighborhood": "Bristol",
+    "description": "Subject is located in Bristol, RI, an established coastal community consisting of single-family, multi-family, and mixed-use properties. Improvements vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes waterfront areas, parks, and public recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n2",
+    "city": "Burrillville",
+    "neighborhood": "Burrillville",
+    "description": "Subject is located in Burrillville, RI, an established semi-rural community consisting primarily of single-family residences with limited supporting commercial development. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes wooded land, reservoirs, and conservation areas.",
+    "notes": ""
+  },
+  {
+    "id": "n3",
+    "city": "Central Falls",
+    "neighborhood": "Central Falls",
+    "description": "Subject is located in Central Falls, RI, an established urban community consisting primarily of multi-family residential properties with some mixed-use development. Properties vary in age, style, and condition. Access to employment, public transportation, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes municipal and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n4",
+    "city": "Charlestown",
+    "neighborhood": "Charlestown",
+    "description": "Subject is located in Charlestown, RI, an established coastal and semi-rural community consisting primarily of single-family residences and seasonal properties with limited commercial development. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes beaches, conservation land, and open space.",
+    "notes": ""
+  },
+  {
+    "id": "n5",
+    "city": "Coventry",
+    "neighborhood": "Coventry",
+    "description": "Subject is located in Coventry, RI, an established residential community consisting of single-family residences with some multi-family and limited commercial properties. Improvements vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes open space, parks, and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n6",
+    "city": "Cranston",
+    "neighborhood": "General",
+    "description": "Subject is located in Cranston, RI, an established residential community consisting of single and multi-family properties with supporting commercial and municipal uses. Properties vary in age, style, and quality. Access to employment, shopping, healthcare, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes parks and public recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n7",
+    "city": "Cranston",
+    "neighborhood": "Edgewood",
+    "description": "Subject is located in the Edgewood section of Cranston, an established residential neighborhood consisting of single and multi-family properties. Improvements vary in age, style, and condition. Access to support services and transportation is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n8",
+    "city": "Cranston",
+    "neighborhood": "Garden City",
+    "description": "Subject is located in the Garden City area of Cranston, an established residential neighborhood with nearby supporting commercial development. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n9",
+    "city": "Cumberland",
+    "neighborhood": "Cumberland",
+    "description": "Subject is located in Cumberland, RI, an established residential community consisting primarily of single-family residences with some condominium and multi-family development. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes open space and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n10",
+    "city": "East Greenwich",
+    "neighborhood": "East Greenwich",
+    "description": "Subject is located in East Greenwich, RI, an established residential community consisting primarily of single-family residences with a village-style center and surrounding neighborhoods. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes waterfront and recreational areas.",
+    "notes": ""
+  },
+  {
+    "id": "n11",
+    "city": "East Providence",
+    "neighborhood": "General",
+    "description": "Subject is located in East Providence, RI, an established residential community consisting of single and multi-family properties with supporting commercial uses. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n12",
+    "city": "East Providence",
+    "neighborhood": "Riverside",
+    "description": "Subject is located in the Riverside section of East Providence, an established residential neighborhood consisting of single and multi-family properties. Improvements vary in age, style, and condition. Access to support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n13",
+    "city": "Exeter",
+    "neighborhood": "Exeter",
+    "description": "Subject is located in Exeter, RI, an established rural residential community consisting primarily of single-family residences on larger parcels. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes conservation land and open space.",
+    "notes": ""
+  },
+  {
+    "id": "n14",
+    "city": "Foster",
+    "neighborhood": "Foster",
+    "description": "Subject is located in Foster, RI, an established rural community consisting primarily of single-family residences on larger parcels. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes farmland, wooded areas, and conservation land.",
+    "notes": ""
+  },
+  {
+    "id": "n15",
+    "city": "Glocester",
+    "neighborhood": "Glocester",
+    "description": "Subject is located in Glocester, RI, an established semi-rural residential community consisting primarily of single-family residences with limited commercial development. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes open space and conservation land.",
+    "notes": ""
+  },
+  {
+    "id": "n16",
+    "city": "Hopkinton",
+    "neighborhood": "Hopkinton",
+    "description": "Subject is located in Hopkinton, RI, an established rural/suburban community consisting primarily of single-family residences. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes wooded and conservation land.",
+    "notes": ""
+  },
+  {
+    "id": "n17",
+    "city": "Jamestown",
+    "neighborhood": "Jamestown",
+    "description": "Subject is located in Jamestown, RI, an established island community consisting primarily of single-family residences. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area via bridge access. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes waterfront and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n18",
+    "city": "Johnston",
+    "neighborhood": "Johnston",
+    "description": "Subject is located in Johnston, RI, an established residential community consisting of single-family, multi-family, and limited commercial properties. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes open space and public land.",
+    "notes": ""
+  },
+  {
+    "id": "n19",
+    "city": "Lincoln",
+    "neighborhood": "Lincoln",
+    "description": "Subject is located in Lincoln, RI, an established residential community consisting primarily of single-family residences with some condominium and commercial development. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes recreational and conservation land.",
+    "notes": ""
+  },
+  {
+    "id": "n20",
+    "city": "Little Compton",
+    "neighborhood": "Little Compton",
+    "description": "Subject is located in Little Compton, RI, a primarily residential coastal community characterized by rural and low-density development patterns. The housing stock consists predominantly of single-family dwellings situated on individual lots, with limited multi-family and commercial development in designated village areas. Properties vary in age, architectural style, and condition. Lot sizes are generally larger than those typical of more densely developed communities. Access to employment, shopping, healthcare, and municipal services is typical for the area and surrounding communities. No adverse neighborhood or environmental conditions were observed at the time of inspection. Land use designated as \"other\" includes agricultural land, conservation areas, open space, and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n21",
+    "city": "Middletown",
+    "neighborhood": "Middletown",
+    "description": "Subject is located in Middletown, RI, an established residential community consisting of single-family, multi-family, and limited commercial properties. Improvements vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes coastal and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n22",
+    "city": "Narragansett",
+    "neighborhood": "Narragansett",
+    "description": "Subject is located in Narragansett, RI, an established residential community consisting of single-family residences, seasonal housing, and limited multi-family properties. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes beaches and public recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n23",
+    "city": "New Shoreham (Block Island)",
+    "neighborhood": "New Shoreham",
+    "description": "Subject is located in New Shoreham, RI, an island community characterized by coastal and low-density residential development patterns. The housing stock consists primarily of single-family dwellings with seasonal occupancy in portions of the market, along with limited multi-family and commercial development concentrated in village areas. Properties vary in age, style, and condition. Development is influenced by coastal features and land use regulations, resulting in larger parcel sizes in many areas. Access to employment, shopping, healthcare, and support services is typical for an island location and is supplemented by mainland communities via ferry and air transportation. No adverse neighborhood or environmental conditions were observed at the time of inspection. Land use designated as \"other\" includes conservation land, open space, and recreational areas.",
+    "notes": ""
+  },
+  {
+    "id": "n24",
+    "city": "Newport",
+    "neighborhood": "General",
+    "description": "Subject is located in Newport, RI, an established residential and mixed-use community consisting of single and multi-family residences and historic housing stock. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n25",
+    "city": "Newport",
+    "neighborhood": "The Point / Historic Districts",
+    "description": "Subject is located in the Point/Historic District area of Newport, an established residential neighborhood characterized by historic single and multi-family residences. Properties typically have smaller site sizes consistent with the area. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n26",
+    "city": "North Kingstown",
+    "neighborhood": "North Kingstown",
+    "description": "Subject is located in North Kingstown, RI, an established residential community consisting primarily of single-family residences with some condominium and mixed-use development. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes waterfront and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n27",
+    "city": "North Providence",
+    "neighborhood": "North Providence",
+    "description": "Subject is located in North Providence, RI, an established residential community consisting primarily of single-family residences with some multi-family development. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n28",
+    "city": "Pawtucket",
+    "neighborhood": "General",
+    "description": "Subject is located in Pawtucket, RI, an established urban residential community consisting of single and multi-family residences and mixed-use properties. Properties vary in age, style, and condition. Access to employment, public transportation, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n29",
+    "city": "Pawtucket",
+    "neighborhood": "Oak Hill",
+    "description": "Subject is located in the Oak Hill section of Pawtucket, an established residential neighborhood consisting primarily of single-family and two-family residences. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n30",
+    "city": "Portsmouth",
+    "neighborhood": "Portsmouth",
+    "description": "Subject is located in Portsmouth, RI, an established residential community consisting primarily of single-family residences with agricultural and waterfront influence in select areas. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes farmland and coastal areas.",
+    "notes": ""
+  },
+  {
+    "id": "n31",
+    "city": "Providence",
+    "neighborhood": "General",
+    "description": "Subject is located in Providence, RI, an established urban community consisting of single and multi-family residences, mixed-use, and commercial properties. Properties vary in age, style, and condition. Access to employment, public transportation, shopping, healthcare, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n32",
+    "city": "Providence",
+    "neighborhood": "East Side",
+    "description": "Subject is located in the East Side of Providence, an established residential neighborhood consisting of single and multi-family properties. Improvements vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n33",
+    "city": "Providence",
+    "neighborhood": "Elmhurst / Mount Pleasant / Federal Hill",
+    "description": "Subject is located in an established Providence residential neighborhood consisting of single and multi-family properties with supporting commercial uses. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n34",
+    "city": "Richmond",
+    "neighborhood": "Richmond",
+    "description": "Subject is located in Richmond, RI, a primarily residential community characterized by rural and semi-rural development patterns. The housing stock consists predominantly of single-family dwellings situated on individual lots, with limited multi-family and commercial development in designated areas. Properties vary in age, style, and condition. Lot sizes are generally larger than those typical of urban communities. Access to employment, shopping, healthcare, and municipal services is typical for the area and surrounding communities. No adverse neighborhood or environmental conditions were observed at the time of inspection. Land use designated as \"other\" includes open space, conservation land, agricultural land, and recreational areas.",
+    "notes": ""
+  },
+  {
+    "id": "n35",
+    "city": "Scituate",
+    "neighborhood": "Scituate",
+    "description": "Subject is located in Scituate, RI, an established rural residential community consisting primarily of single-family residences on larger parcels. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes reservoirs and conservation land.",
+    "notes": ""
+  },
+  {
+    "id": "n36",
+    "city": "Smithfield",
+    "neighborhood": "Smithfield",
+    "description": "Subject is located in Smithfield, RI, an established residential community consisting primarily of single-family residences with some condominium and commercial development. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes open space and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n37",
+    "city": "South Kingstown",
+    "neighborhood": "South Kingstown",
+    "description": "Subject is located in South Kingstown, RI, an established residential community consisting of single-family residences, seasonal housing, and limited multi-family properties. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes beaches and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n38",
+    "city": "Tiverton",
+    "neighborhood": "Tiverton",
+    "description": "Subject is located in Tiverton, RI, an established residential community consisting of single-family residences with agricultural and waterfront influence in select areas. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes farmland and coastal land.",
+    "notes": ""
+  },
+  {
+    "id": "n39",
+    "city": "Warren",
+    "neighborhood": "Warren",
+    "description": "Subject is located in Warren, RI, an established residential and mixed-use waterfront community consisting of single and multi-family residences. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes waterfront and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n40",
+    "city": "Warwick",
+    "neighborhood": "General",
+    "description": "Subject is located in Warwick, RI, an established residential community consisting of single and multi-family residences. Properties vary in age, style, and quality. Access to employment, shopping, transportation, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n41",
+    "city": "Warwick",
+    "neighborhood": "Apponaug / Cowesett / Gaspee",
+    "description": "Subject is located in an established Warwick residential neighborhood characterized by single and multi-family development with supporting commercial uses in the broader area. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  },
+  {
+    "id": "n42",
+    "city": "West Greenwich",
+    "neighborhood": "West Greenwich",
+    "description": "Subject is located in West Greenwich, RI, an established rural residential community consisting primarily of single-family residences on larger parcels. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area and surrounding communities. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes conservation land and open space.",
+    "notes": ""
+  },
+  {
+    "id": "n43",
+    "city": "West Warwick",
+    "neighborhood": "West Warwick",
+    "description": "Subject is centrally located in West Warwick, RI, in an established residential neighborhood consisting of single and multi-family properties. Properties vary in age, style, and condition. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" consists of vacant land, parks, and public recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n44",
+    "city": "Westerly",
+    "neighborhood": "Westerly",
+    "description": "Subject is located in Westerly, RI, an established residential community consisting of single and multi-family residences with seasonal occupancy in select areas. Properties vary in age, style, and quality. Access to employment, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed. Land use designated as \"other\" includes beaches and recreational land.",
+    "notes": ""
+  },
+  {
+    "id": "n45",
+    "city": "Woonsocket",
+    "neighborhood": "Woonsocket",
+    "description": "Subject is located in Woonsocket, RI, an established urban residential community consisting of single and multi-family residences and mixed-use properties. Properties vary in age, style, and condition. Access to employment, public transportation, shopping, and support services is typical for the area. No adverse neighborhood conditions were observed.",
+    "notes": ""
+  }
+]
