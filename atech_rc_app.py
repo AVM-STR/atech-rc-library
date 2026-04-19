@@ -2483,7 +2483,9 @@ with tab8:
 
     def _t8_paired(df, feat):
         """Paired Sales with Synapse matching criteria + 1.5-IQR outlier removal."""
-        needed = [c for c in list(PAIR_RULES.keys()) + [feat, _P] if c in df.columns]
+        if df is None or feat not in df.columns or _P not in df.columns:
+            return np.nan, np.nan, 0, 0
+        needed = list({c for c in list(PAIR_RULES.keys()) + [feat, _P] if c in df.columns})
         sub = df[needed].dropna(subset=[feat, _P]).reset_index(drop=True)
         sub = sub[sub[_P] > 0]
         n = len(sub)
