@@ -2350,26 +2350,53 @@ with tab8:
     import numpy as np
     from scipy import stats as _scipy_stats
 
-    st.subheader("Adjustment Support")
-    st.caption("Upload Synapse MLS CSV exports to automatically derive market-supported adjustments.")
-    st.divider()
+    # ── Column constants ──────────────────────────────────────────────────────
+    _P   = "Sold Price"
+    _GLA = "Apx Abv Gr LivSF"
+    _LOT = "Approx Lot Square Foot"
+    _BGS = "Apx Blw Gr Liv SF"
+    _FB  = "Baths Full"
+    _HB  = "Baths Half"
+    _BD  = "Beds Total"
+    _GS  = "Garage Spaces"
+    _FP  = "Number Of Fireplaces"
+    _PL  = "Pool"
+    _DT  = "Closed Date"
+    _YB  = "Year Built"
+    _BP  = "Basement Est % Finished"
+    _SP  = "Seller Paid"
 
-    # ── CSV UPLOAD ────────────────────────────────────────────────────────────
-    up_col1, up_col2 = st.columns(2)
-    with up_col1:
-        comps_file = st.file_uploader(
-            "Comps CSV (Synapse MLS export)", type=["csv"], key="as_comps_csv"
-        )
-    with up_col2:
-        nbhd_file = st.file_uploader(
-            "Neighborhood CSV (optional — pooled into analysis)", type=["csv"], key="as_nbhd_csv"
-        )
+    CONT_FEATS  = [_GLA, _LOT, _BGS]
+    COUNT_FEATS = [_FB, _HB, _BD, _GS, _FP]
+    BIN_FEATS   = [_PL]
+    ALL_FEATS   = CONT_FEATS + COUNT_FEATS + BIN_FEATS
 
-    # ── HELPER FUNCTIONS ──────────────────────────────────────────────────────
-    def _load_synapse_csv(f):
+    FEAT_LABEL = {
+        _GLA: "GLA (SF)",        _LOT: "Lot Size (SF)",  _BGS: "Below Grade SF",
+        _FB:  "Full Baths",      _HB:  "Half Baths",     _BD:  "Bedrooms",
+        _GS:  "Garage Spaces",   _FP:  "Fireplaces",     _PL:  "Pool",
+    }
+    FEAT_TYPE = {
+        **{f: "continuous" for f in CONT_FEATS},
+        **{f: "count"      for f in COUNT_FEATS},
+        **{f: "binary"     for f in BIN_FEATS},
+    }
+    # Paired Sales matching rules for each column
+    PAIR_RULES = {
+        _GLA: "pct5",   # within 5%
+        _LOT: "pct5",
+        _FB:  "exact",
+        _HB:  "exact",
+        _GS:  "exact",
+        _FP:  "fire",   # identical OR both > 0
+        _BD:  "beds",   # identical OR both > 3
+        _PL:  "exact",
+    }
+
+    # ── Helper functions ──────────────────────────────────────────────────────
+    def _t8_load(f):
         try:
-            raw = f.read()
-            f.seek(0)
+            raw = f.read(); f.seek(0)
         except Exception:
             return None
         for enc in ("utf-8-sig", "utf-8", "latin-1"):
@@ -2379,709 +2406,527 @@ with tab8:
                 continue
         return None
 
-    _AS_PRICE_COL      = "Sold Price"
-    _AS_YEAR_BUILT     = "Year Built"
-    _AS_GLA_COL        = "Apx Abv Gr LivSF"
-    _AS_CTRL_NEEDED    = {
-        "Baths Total", "Baths Full", "Baths Half",
-        "Beds Total", "Garage Spaces", "Number Of Fireplaces",
-    }
-    _AS_BSMT_TOTAL_COL  = "Apx Blw Gr Liv SF"
-    _AS_BSMT_PCT_COL    = "Basement Est % Finished"
-    _AS_BSMT_FIN_COL    = "Finished Bsmt SF"
-    _AS_SELLER_PAID_COL = "Seller Paid"
-    _AS_DEFAULT_FEATURES = [
-        "Apx Abv Gr LivSF",
-        "Approx Lot Square Foot",
-        "Finished Bsmt SF",
-        "Baths Total",
-        "Beds Total",
-        "Garage Spaces",
-        "Age",
-        "Number Of Fireplaces",
-    ]
-
-    def _as_prep_df(df_raw):
+    def _t8_prep(df_raw):
         df = df_raw.copy()
-        if _AS_PRICE_COL in df.columns:
-            df[_AS_PRICE_COL] = (
-                df[_AS_PRICE_COL].astype(str)
-                .str.replace(r"[\$,]", "", regex=True)
-                .pipe(pd.to_numeric, errors="coerce")
-            )
-        if _AS_YEAR_BUILT in df.columns:
-            df["Age"] = date.today().year - pd.to_numeric(df[_AS_YEAR_BUILT], errors="coerce")
-        # Derive finished basement SF from total basement SF × % finished
-        if _AS_BSMT_TOTAL_COL in df.columns and _AS_BSMT_PCT_COL in df.columns:
-            _bsmt_total = pd.to_numeric(df[_AS_BSMT_TOTAL_COL], errors="coerce")
-            _bsmt_pct   = pd.to_numeric(df[_AS_BSMT_PCT_COL],   errors="coerce")
-            df[_AS_BSMT_FIN_COL] = (_bsmt_total * _bsmt_pct / 100.0).round(0)
+        if _P in df.columns:
+            df[_P] = (df[_P].astype(str).str.replace(r"[\$,]", "", regex=True)
+                      .pipe(pd.to_numeric, errors="coerce"))
+        if _SP in df.columns:
+            df[_SP] = (df[_SP].astype(str).str.replace(r"[\$,]", "", regex=True)
+                       .pipe(pd.to_numeric, errors="coerce").fillna(0.0))
+        if _DT in df.columns:
+            df[_DT] = pd.to_datetime(df[_DT], errors="coerce")
+        if _YB in df.columns:
+            df["Age"] = date.today().year - pd.to_numeric(df[_YB], errors="coerce")
+        # Finished basement SF = below-grade SF × % finished / 100
+        if _BGS in df.columns and _BP in df.columns:
+            _bt = pd.to_numeric(df[_BGS], errors="coerce")
+            _bp = pd.to_numeric(df[_BP],  errors="coerce")
+            df[_BGS] = (_bt * _bp / 100.0).round(0)
+        # Pool → 0/1
+        if _PL in df.columns:
+            _s = df[_PL].astype(str).str.strip().str.upper()
+            _pe = pd.Series(np.nan, index=df.index)
+            _pe.loc[_s.isin(["YES","Y","1","TRUE","HAS POOL","POOL"])]           = 1.0
+            _pe.loc[_s.isin(["NO","N","0","FALSE","NONE","NO POOL","NONE/NA",""])] = 0.0
+            df[_PL] = _pe
+        for _c in ALL_FEATS:
+            if _c in df.columns and _c != _PL:
+                df[_c] = pd.to_numeric(df[_c], errors="coerce")
         return df
 
-    def _as_binary_encode(df, col):
-        s = df[col].astype(str).str.strip().str.upper()
-        result = pd.Series(np.nan, index=df.index)
-        result.loc[s.isin(["YES", "Y", "1", "TRUE", "HAS CENTRAL", "CENTRAL AIR", "AC"])] = 1.0
-        result.loc[s.isin(["NO", "N", "0", "FALSE", "NONE", "NO POOL", ""])]             = 0.0
-        return result
-
-    def _as_ols1(x_arr, y_arr):
-        X = np.column_stack([np.ones(len(y_arr)), x_arr])
-        try:
-            beta = np.linalg.solve(X.T @ X, X.T @ y_arr)
-        except np.linalg.LinAlgError:
-            beta = np.linalg.lstsq(X, y_arr, rcond=None)[0]
-        yhat   = X @ beta
-        ss_res = np.sum((y_arr - yhat) ** 2)
-        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
-        r2     = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
-        n, k   = len(y_arr), 1
-        mse    = ss_res / (n - k - 1) if n > k + 1 else 0.0
-        se     = np.sqrt(np.diag(np.linalg.pinv(X.T @ X) * mse))
-        return beta[1], beta[0], r2, se[1]
-
-    def _as_theil(x_arr, y_arr):
-        if len(x_arr) < 3:
-            return np.nan
-        return _scipy_stats.theilslopes(y_arr, x_arr).slope
-
-    def _as_loo(x_arr, y_arr):
-        ols_v, ts_v = [], []
-        for i in range(len(x_arr)):
-            mask = np.ones(len(x_arr), dtype=bool)
-            mask[i] = False
-            xl, yl = x_arr[mask], y_arr[mask]
-            if len(xl) < 3:
-                continue
-            ols_v.append(_as_ols1(xl, yl)[0])
-            ts_v.append(_as_theil(xl, yl))
-        ols_v = [v for v in ols_v if not np.isnan(v)]
-        ts_v  = [v for v in ts_v  if not np.isnan(v)]
-        return (
-            min(ols_v) if ols_v else np.nan,
-            max(ols_v) if ols_v else np.nan,
-            min(ts_v)  if ts_v  else np.nan,
-            max(ts_v)  if ts_v  else np.nan,
-        )
-
-    def _as_stability(slope, lo, hi):
-        if np.isnan(slope) or slope == 0:
+    def _fv(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
             return "—"
-        ratio = abs(hi - lo) / abs(slope)
-        if ratio < 0.20:
-            return "✅ Stable"
-        if ratio < 0.40:
-            return "⚠️ Moderate"
-        return "🔴 Sensitive"
+        return f"${v:,.0f}"
 
-    def _as_paired(x_arr, y_arr):
-        """Pairwise slopes with 1.5-IQR outlier removal (Synapse Paired Sales).
-        Returns (median, avg, n_clean, n_raw)."""
+    def _t8_ols(x, y):
+        if len(x) < 4: return np.nan
+        X = np.column_stack([np.ones(len(y)), x])
+        try:
+            b = np.linalg.solve(X.T @ X, X.T @ y)
+        except Exception:
+            b = np.linalg.lstsq(X, y, rcond=None)[0]
+        return float(b[1])
+
+    def _t8_theil(x, y):
+        if len(x) < 3: return np.nan
+        return float(_scipy_stats.theilslopes(y, x).slope)
+
+    def _t8_grp_cont(x, y):
+        """Synapse grouped: split at median x, median prices, divide by mean feature gap."""
+        if len(x) < 4: return np.nan, 0, 0
+        med = np.median(x)
+        lo = x <= med; hi = x > med
+        if lo.sum() < 2 or hi.sum() < 2: return np.nan, 0, 0
+        denom = np.mean(x[hi]) - np.mean(x[lo])
+        if denom == 0: return np.nan, int(lo.sum()), int(hi.sum())
+        return float((np.median(y[hi]) - np.median(y[lo])) / denom), int(lo.sum()), int(hi.sum())
+
+    def _t8_grp_count(x, y):
+        """Adjacent-count grouped analysis. Returns list of (adj, n_lo, n_hi, lo_val, hi_val)."""
+        med = int(round(float(np.nanmedian(x))))
+        results = []
+        for lo_v, hi_v in [(med - 1, med), (med, med + 1)]:
+            if lo_v < 0: continue
+            g0 = y[x == lo_v]; g1 = y[x == hi_v]
+            if len(g0) < 1 or len(g1) < 1: continue
+            results.append((float(np.median(g1) - np.median(g0)),
+                            len(g0), len(g1), lo_v, hi_v))
+        return results
+
+    def _t8_grp_binary(x, y):
+        """Pool grouped: without (0) vs with (1). Returns (adj, n_without, n_with)."""
+        g0 = y[x == 0]; g1 = y[x == 1]
+        if len(g0) < 2 or len(g1) < 2: return np.nan, 0, 0
+        return float(np.median(g1) - np.median(g0)), len(g0), len(g1)
+
+    def _t8_paired(df, feat):
+        """Paired Sales with Synapse matching criteria + 1.5-IQR outlier removal."""
+        needed = [c for c in list(PAIR_RULES.keys()) + [feat, _P] if c in df.columns]
+        sub = df[needed].dropna(subset=[feat, _P]).reset_index(drop=True)
+        sub = sub[sub[_P] > 0]
+        n = len(sub)
+        if n < 3: return np.nan, np.nan, 0, 0
         slopes = []
-        n = len(x_arr)
         for i in range(n):
             for j in range(i + 1, n):
-                dx = x_arr[j] - x_arr[i]
-                if abs(dx) < 1e-10:
-                    continue
-                slopes.append((y_arr[j] - y_arr[i]) / dx)
-        if len(slopes) < 2:
-            return np.nan, np.nan, 0, len(slopes)
-        s = np.array(slopes)
-        n_raw = len(s)
+                dx = float(sub.at[j, feat]) - float(sub.at[i, feat])
+                if abs(dx) < 1e-10: continue
+                ok = True
+                for mc, rule in PAIR_RULES.items():
+                    if mc == feat or mc not in sub.columns: continue
+                    vi = sub.at[i, mc]; vj = sub.at[j, mc]
+                    if pd.isna(vi) or pd.isna(vj): ok = False; break
+                    vi = float(vi); vj = float(vj)
+                    if rule == "exact":
+                        if vi != vj: ok = False; break
+                    elif rule == "pct5":
+                        avg_v = (abs(vi) + abs(vj)) / 2.0
+                        if avg_v > 0 and abs(vi - vj) / avg_v > 0.05: ok = False; break
+                    elif rule == "fire":
+                        if not (vi == vj or (vi > 0 and vj > 0)): ok = False; break
+                    elif rule == "beds":
+                        if not (vi == vj or (vi > 3 and vj > 3)): ok = False; break
+                if not ok: continue
+                slopes.append((float(sub.at[j, _P]) - float(sub.at[i, _P])) / dx)
+        if len(slopes) < 2: return np.nan, np.nan, len(slopes), len(slopes)
+        s = np.array(slopes); n_raw = len(s)
         q1, q3 = np.percentile(s, 25), np.percentile(s, 75)
-        iqr    = q3 - q1
-        keep   = s[(s >= q1 - 1.5 * iqr) & (s <= q3 + 1.5 * iqr)]
-        if len(keep) < 1:
-            return np.nan, np.nan, 0, n_raw
+        iqr = q3 - q1
+        keep = s[(s >= q1 - 1.5 * iqr) & (s <= q3 + 1.5 * iqr)]
+        if len(keep) < 1: return np.nan, np.nan, 0, n_raw
         return float(np.median(keep)), float(np.mean(keep)), len(keep), n_raw
 
-    def _as_sensitivity(x_arr, y_arr, subject_val, n_steps=600):
-        """Synapse Sensitivity Analysis: find the adjustment that minimises the
-        range of prices after adjusting all comps to the subject feature value."""
-        # Estimate a sensible sweep range from the data
-        ts = _as_theil(x_arr, y_arr)
-        center = ts if (ts is not None and not np.isnan(ts)) else 0.0
-        half   = max(abs(center) * 2.0, 500.0)
-        candidates = np.linspace(center - half, center + half, n_steps)
-        best_adj, best_range = np.nan, np.inf
-        for adj in candidates:
-            adj_prices = y_arr - (x_arr - subject_val) * adj
-            r = float(np.max(adj_prices) - np.min(adj_prices))
-            if r < best_range:
-                best_range = r
-                best_adj   = float(adj)
-        return best_adj, best_range
+    def _run_feat(df, feat):
+        """Run all applicable methods for one feature on one DataFrame."""
+        if df is None or feat not in df.columns or _P not in df.columns:
+            return {"n": 0}
+        sub = df[[feat, _P]].dropna().copy()
+        sub = sub[sub[_P] > 0].reset_index(drop=True)
+        x = sub[feat].values.astype(float)
+        y = sub[_P].values.astype(float)
+        n = len(x)
+        r = {"n": n}
+        ft = FEAT_TYPE[feat]
+        if ft == "continuous":
+            r["ols"]   = _t8_ols(x, y)   if n >= 4 else np.nan
+            r["theil"] = _t8_theil(x, y) if n >= 3 else np.nan
+            grp, nlo, nhi = _t8_grp_cont(x, y)
+            r["grp"] = grp; r["grp_n"] = (nlo, nhi)
+        elif ft == "count":
+            r["ols"] = np.nan; r["theil"] = np.nan
+            cnt = _t8_grp_count(x, y)
+            r["grp_count"] = cnt
+            vals = [v[0] for v in cnt if not np.isnan(v[0])]
+            r["grp"] = float(np.mean(vals)) if vals else np.nan
+        else:  # binary
+            r["ols"] = np.nan; r["theil"] = np.nan
+            grp, n0, n1 = _t8_grp_binary(x, y)
+            r["grp"] = grp; r["grp_n"] = (n0, n1)
+        return r
 
-    def _as_ols_ctrl(x_arr, ctrl_arr, y_arr):
-        """OLS: y ~ intercept + ctrl + x. Returns (x_coef, r2, se_x)."""
-        X = np.column_stack([np.ones(len(y_arr)), ctrl_arr, x_arr])
-        try:
-            beta = np.linalg.solve(X.T @ X, X.T @ y_arr)
-        except np.linalg.LinAlgError:
-            beta = np.linalg.lstsq(X, y_arr, rcond=None)[0]
-        yhat   = X @ beta
-        ss_res = np.sum((y_arr - yhat) ** 2)
-        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
-        r2     = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
-        n, k   = len(y_arr), 2
-        mse    = ss_res / (n - k - 1) if n > k + 1 else 0.0
-        se     = np.sqrt(np.diag(np.linalg.pinv(X.T @ X) * mse))
-        return beta[2], r2, se[2]
-
-    def _as_theil_ctrl(x_arr, ctrl_arr, y_arr):
-        """Theil-Sen after partialing out ctrl via OLS residuals (Frisch-Waugh)."""
-        if len(x_arr) < 4:
-            return np.nan
-        Xc = np.column_stack([np.ones(len(y_arr)), ctrl_arr])
-        b_y   = np.linalg.lstsq(Xc, y_arr, rcond=None)[0]
-        y_res = y_arr - Xc @ b_y
-        b_x   = np.linalg.lstsq(Xc, x_arr, rcond=None)[0]
-        x_res = x_arr - Xc @ b_x
-        if np.std(x_res) < 1e-10:
-            return np.nan
-        return _scipy_stats.theilslopes(y_res, x_res).slope
-
-    def _as_grp_ctrl(x_arr, ctrl_arr, y_arr):
-        """Grouped avg/med on GLA-residualized price."""
-        if len(x_arr) < 4:
-            return np.nan, np.nan
-        Xc    = np.column_stack([np.ones(len(y_arr)), ctrl_arr])
-        b_y   = np.linalg.lstsq(Xc, y_arr, rcond=None)[0]
-        y_res = y_arr - Xc @ b_y
-        med_x = np.median(x_arr)
-        glo   = y_res[x_arr <= med_x]
-        ghi   = y_res[x_arr >  med_x]
-        if len(glo) < 2 or len(ghi) < 2:
-            return np.nan, np.nan
-        xgap = np.median(x_arr[x_arr > med_x]) - np.median(x_arr[x_arr <= med_x])
-        if xgap == 0:
-            return np.nan, np.nan
-        return (np.mean(ghi) - np.mean(glo)) / xgap, (np.median(ghi) - np.median(glo)) / xgap
-
-    def _as_loo_ctrl(x_arr, ctrl_arr, y_arr):
-        """LOO sensitivity using GLA-controlled OLS and Theil-Sen."""
-        ols_v, ts_v = [], []
-        for i in range(len(x_arr)):
-            mask = np.ones(len(x_arr), dtype=bool)
-            mask[i] = False
-            xl, cl, yl = x_arr[mask], ctrl_arr[mask], y_arr[mask]
-            if len(xl) < 4:
-                continue
-            ols_v.append(_as_ols_ctrl(xl, cl, yl)[0])
-            ts_v.append(_as_theil_ctrl(xl, cl, yl))
-        ols_v = [v for v in ols_v if not np.isnan(v)]
-        ts_v  = [v for v in ts_v  if not np.isnan(v)]
-        return (
-            min(ols_v) if ols_v else np.nan,
-            max(ols_v) if ols_v else np.nan,
-            min(ts_v)  if ts_v  else np.nan,
-            max(ts_v)  if ts_v  else np.nan,
-        )
-
-    # ── MAIN ANALYSIS ─────────────────────────────────────────────────────────
-    if comps_file is not None:
-        _df_comps_raw = _load_synapse_csv(comps_file)
-        if _df_comps_raw is None:
-            st.error("Could not parse comps CSV.")
-        else:
-            _df_all = _as_prep_df(_df_comps_raw)
-
-            if nbhd_file is not None:
-                _df_nbhd_raw = _load_synapse_csv(nbhd_file)
-                if _df_nbhd_raw is not None:
-                    _df_all = pd.concat([_df_all, _as_prep_df(_df_nbhd_raw)], ignore_index=True)
-
-            if _AS_PRICE_COL not in _df_all.columns:
-                st.error(f"Column '{_AS_PRICE_COL}' not found. Ensure this is a Synapse MLS export.")
-            else:
-                _df_v = _df_all[pd.to_numeric(_df_all[_AS_PRICE_COL], errors="coerce").notna()].copy()
-                _df_v[_AS_PRICE_COL] = _df_v[_AS_PRICE_COL].astype(float)
-
-                # ── Seller concession pre-adjustment ──────────────────────────
-                _has_concessions = _AS_SELLER_PAID_COL in _df_v.columns
-                _deduct_conc = st.checkbox(
-                    "Deduct seller concessions from sale price before analysis",
-                    value=False,
-                    key="as_deduct_conc",
-                    disabled=not _has_concessions,
-                    help="Subtracts the 'Seller Paid' amount from each sale price (Synapse transactional pre-adjustment)."
-                         if _has_concessions else "Column 'Seller Paid' not found in this CSV.",
-                )
-                if _deduct_conc and _has_concessions:
-                    _conc = pd.to_numeric(_df_v[_AS_SELLER_PAID_COL], errors="coerce").fillna(0.0)
-                    _df_v[_AS_PRICE_COL] = (_df_v[_AS_PRICE_COL] - _conc).clip(lower=0)
-                    st.caption(f"Seller concessions deducted — avg ${_conc[_conc > 0].mean():,.0f}, "
-                               f"{(_conc > 0).sum()} of {len(_conc)} sales had reported concessions.")
-
-                for _bc in ("Pool", "Cooling"):
-                    if _bc in _df_v.columns:
-                        _df_v[_bc] = _as_binary_encode(_df_v, _bc)
-
-                _num_cols = [
-                    c for c in _df_v.columns
-                    if c != _AS_PRICE_COL and c != _AS_YEAR_BUILT
-                    and pd.to_numeric(_df_v[c], errors="coerce").notna().sum() >= 4
-                ]
-                _def_sel = [c for c in _AS_DEFAULT_FEATURES if c in _num_cols]
-
-                _n_comps = len(_df_comps_raw)
-                _n_nbhd  = len(_df_all) - _n_comps if nbhd_file else 0
-                st.success(
-                    f"Loaded **{len(_df_v)}** valid sales"
-                    + (f" ({_n_comps} comps + {_n_nbhd} neighborhood)" if _n_nbhd else f" ({_n_comps} comps)")
-                    + "."
-                )
-                st.divider()
-
-                _selected = st.multiselect(
-                    "Select features to analyze",
-                    options=_num_cols,
-                    default=_def_sel,
-                    key="as_feature_sel",
-                )
-
-                if not _selected:
-                    st.info("Select at least one feature above to run the analysis.")
-                else:
-                    if st.button("▶ Run All Methods", key="as_run_all", use_container_width=True, type="primary"):
-                        _rows = []
-                        _gla_avail = _AS_GLA_COL in _df_v.columns
-
-                        def _fmtv(v):
-                            return f"${v:,.0f}" if (v is not None and not np.isnan(v)) else "—"
-
-                        def _grp_raw(x_arr, y_arr):
-                            """Grouped Data on raw prices — Synapse method."""
-                            med_x = np.median(x_arr)
-                            glo   = y_arr[x_arr <= med_x]
-                            ghi   = y_arr[x_arr >  med_x]
-                            if len(glo) < 2 or len(ghi) < 2:
-                                return np.nan, np.nan
-                            xgap = np.median(x_arr[x_arr > med_x]) - np.median(x_arr[x_arr <= med_x])
-                            if xgap == 0:
-                                return np.nan, np.nan
-                            return ((np.mean(ghi)   - np.mean(glo))   / xgap,
-                                    (np.median(ghi) - np.median(glo)) / xgap)
-
-                        for _feat in _selected:
-                            _use_ctrl = _feat in _AS_CTRL_NEEDED and _gla_avail
-
-                            if _use_ctrl:
-                                _trip  = _df_v[[_feat, _AS_PRICE_COL, _AS_GLA_COL]].copy()
-                                _trip[_feat]       = pd.to_numeric(_trip[_feat],       errors="coerce")
-                                _trip[_AS_GLA_COL] = pd.to_numeric(_trip[_AS_GLA_COL], errors="coerce")
-                                _trip = _trip.dropna()
-                                _trip = _trip[(_trip[_AS_PRICE_COL] > 0) & (_trip[_AS_GLA_COL] > 0)]
-                                _nf   = len(_trip)
-                                _ctrl_label = "GLA"
-                                if _nf < 5:
-                                    _rows.append({
-                                        "Feature": _feat, "n": _nf, "OLS Ctrl": _ctrl_label,
-                                        "Paired Med": "—", "Paired Avg": "—", "Pairs (n)": 0,
-                                        "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
-                                        "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
-                                        "LOO Min": "—", "LOO Max": "—", "Stability": "—",
-                                    })
-                                    continue
-                                _xa = _trip[_feat].values.astype(float)
-                                _ya = _trip[_AS_PRICE_COL].values.astype(float)
-                                _ca = _trip[_AS_GLA_COL].values.astype(float)
-                                _ols_s, _r2, _  = _as_ols_ctrl(_xa, _ca, _ya)
-                                _ts_s           = _as_theil_ctrl(_xa, _ca, _ya)
-                                _lo, _hi, _, _  = _as_loo_ctrl(_xa, _ca, _ya)
-                            else:
-                                _pair = _df_v[[_feat, _AS_PRICE_COL]].copy()
-                                _pair[_feat] = pd.to_numeric(_pair[_feat], errors="coerce")
-                                _pair = _pair.dropna()
-                                _pair = _pair[_pair[_AS_PRICE_COL] > 0]
-                                _nf   = len(_pair)
-                                _ctrl_label = "—"
-                                if _nf < 4:
-                                    _rows.append({
-                                        "Feature": _feat, "n": _nf, "OLS Ctrl": _ctrl_label,
-                                        "Paired Med": "—", "Paired Avg": "—", "Pairs (n)": 0,
-                                        "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
-                                        "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
-                                        "LOO Min": "—", "LOO Max": "—", "Stability": "—",
-                                    })
-                                    continue
-                                _xa = _pair[_feat].values.astype(float)
-                                _ya = _pair[_AS_PRICE_COL].values.astype(float)
-                                _ols_s, _, _r2, _ = _as_ols1(_xa, _ya)
-                                _ts_s             = _as_theil(_xa, _ya)
-                                _lo, _hi, _, _    = _as_loo(_xa, _ya)
-
-                            # Grouped Data — raw prices (Synapse method)
-                            _g_avg, _g_med = _grp_raw(_xa, _ya)
-
-                            # Paired Sales — pairwise slopes, 1.5-IQR outlier removal
-                            _p_med, _p_avg, _p_n, _ = _as_paired(_xa, _ya)
-
-                            _stab = _as_stability(_ols_s, _lo, _hi)
-
-                            _rows.append({
-                                "Feature":            _feat,
-                                "n":                  _nf,
-                                "OLS Ctrl":           _ctrl_label,
-                                "Paired Med":         _fmtv(_p_med),
-                                "Paired Avg":         _fmtv(_p_avg),
-                                "Pairs (n)":          _p_n,
-                                "OLS ($/unit)":       _fmtv(_ols_s),
-                                "Theil-Sen ($/unit)": _fmtv(_ts_s),
-                                "Grp Avg ($/unit)":   _fmtv(_g_avg),
-                                "Grp Med ($/unit)":   _fmtv(_g_med),
-                                "LOO Min":            _fmtv(_lo),
-                                "LOO Max":            _fmtv(_hi),
-                                "Stability":          _stab,
-                            })
-                        st.session_state["as_results"] = _rows
-
-                    if st.session_state.get("as_results"):
-                        _res = st.session_state["as_results"]
-                        st.divider()
-                        st.markdown("#### Results — All Methods Side-by-Side")
-                        st.caption(
-                            "**Paired Med/Avg**: all pairwise slopes with 1.5-IQR outlier removal (Synapse Paired Sales). "
-                            "**OLS Ctrl = GLA**: for count features (baths, beds, garage, fireplaces) OLS runs as "
-                            "Price ~ GLA + Feature to isolate the feature from house-size correlation; "
-                            "Theil-Sen is Frisch-Waugh partialised. "
-                            "**Grouped Data** uses raw median-split price differences (Synapse method). "
-                            "**LOO Min/Max** = OLS slope range from leave-one-out."
-                        )
-                        st.dataframe(pd.DataFrame(_res), use_container_width=True, hide_index=True)
-
-                        # ── SINGLE-FEATURE FOCUSED REGRESSION ────────────────
-                        st.divider()
-                        st.markdown("#### Single-Feature Regression")
-                        st.caption(
-                            "Isolate one feature with one explicit control variable. "
-                            "Use this when the batch results look unrealistic — pick the feature "
-                            "you want to price and the one variable most correlated with it."
-                        )
-                        _sf_col1, _sf_col2, _sf_col3 = st.columns(3)
-                        with _sf_col1:
-                            _sf_feat = st.selectbox(
-                                "Feature to analyze",
-                                options=_num_cols,
-                                index=_num_cols.index(_selected[0]) if _selected and _selected[0] in _num_cols else 0,
-                                key="sf_feat",
-                            )
-                        with _sf_col2:
-                            _sf_ctrl_opts = ["(none)"] + [c for c in _num_cols if c != _sf_feat]
-                            _sf_ctrl_default = _AS_GLA_COL if _AS_GLA_COL in _sf_ctrl_opts else "(none)"
-                            _sf_ctrl = st.selectbox(
-                                "Control variable",
-                                options=_sf_ctrl_opts,
-                                index=_sf_ctrl_opts.index(_sf_ctrl_default),
-                                key="sf_ctrl",
-                            )
-                        with _sf_col3:
-                            _sf_ci = st.selectbox(
-                                "Confidence interval",
-                                options=["90%", "95%"],
-                                index=0,
-                                key="sf_ci",
-                            )
-
-                        if st.button("▶ Run Single-Feature Regression", key="sf_run", use_container_width=True):
-                            _sf_use_ctrl = _sf_ctrl != "(none)"
-                            _sf_cols_need = [_sf_feat, _AS_PRICE_COL] + ([_sf_ctrl] if _sf_use_ctrl else [])
-                            _sf_df = _df_v[_sf_cols_need].copy()
-                            _sf_df[_sf_feat] = pd.to_numeric(_sf_df[_sf_feat], errors="coerce")
-                            if _sf_use_ctrl:
-                                _sf_df[_sf_ctrl] = pd.to_numeric(_sf_df[_sf_ctrl], errors="coerce")
-                            _sf_df = _sf_df.dropna()
-                            _sf_df = _sf_df[_sf_df[_AS_PRICE_COL] > 0]
-                            _sf_n  = len(_sf_df)
-
-                            _sf_alpha = 0.05 if _sf_ci == "95%" else 0.10
-                            _sf_ci_label = _sf_ci
-
-                            if _sf_n < 4:
-                                st.error(f"Only {_sf_n} complete rows — need at least 4.")
-                            else:
-                                _sf_xa = _sf_df[_sf_feat].values.astype(float)
-                                _sf_ya = _sf_df[_AS_PRICE_COL].values.astype(float)
-
-                                if _sf_use_ctrl:
-                                    _sf_ca = _sf_df[_sf_ctrl].values.astype(float)
-                                    _sf_X  = np.column_stack([np.ones(_sf_n), _sf_ca, _sf_xa])
-                                    _sf_feat_idx = 2
-                                    _sf_k = 2
-                                else:
-                                    _sf_X  = np.column_stack([np.ones(_sf_n), _sf_xa])
-                                    _sf_feat_idx = 1
-                                    _sf_k = 1
-
-                                try:
-                                    _sf_beta = np.linalg.solve(_sf_X.T @ _sf_X, _sf_X.T @ _sf_ya)
-                                except np.linalg.LinAlgError:
-                                    _sf_beta = np.linalg.lstsq(_sf_X, _sf_ya, rcond=None)[0]
-
-                                _sf_yhat   = _sf_X @ _sf_beta
-                                _sf_ssr    = np.sum((_sf_ya - _sf_yhat) ** 2)
-                                _sf_sst    = np.sum((_sf_ya - np.mean(_sf_ya)) ** 2)
-                                _sf_r2     = 1 - _sf_ssr / _sf_sst if _sf_sst > 0 else 0.0
-                                _sf_adj_r2 = 1 - (1 - _sf_r2) * (_sf_n - 1) / (_sf_n - _sf_k - 1) if _sf_n > _sf_k + 1 else 0.0
-                                _sf_mse    = _sf_ssr / (_sf_n - _sf_k - 1) if _sf_n > _sf_k + 1 else 0.0
-                                _sf_se_all = np.sqrt(np.diag(np.linalg.pinv(_sf_X.T @ _sf_X) * _sf_mse))
-                                _sf_coef   = _sf_beta[_sf_feat_idx]
-                                _sf_se     = _sf_se_all[_sf_feat_idx]
-                                _sf_df_t   = max(_sf_n - _sf_k - 1, 1)
-                                _sf_tv     = _sf_coef / _sf_se if _sf_se > 0 else 0.0
-                                _sf_pv     = 2 * (1 - _scipy_stats.t.cdf(abs(_sf_tv), df=_sf_df_t))
-                                _sf_t_crit = _scipy_stats.t.ppf(1 - _sf_alpha / 2, df=_sf_df_t)
-                                _sf_lo     = _sf_coef - _sf_t_crit * _sf_se
-                                _sf_hi     = _sf_coef + _sf_t_crit * _sf_se
-
-                                # Theil-Sen for comparison
-                                if _sf_use_ctrl:
-                                    _sf_ts = _as_theil_ctrl(_sf_xa, _sf_ca, _sf_ya)
-                                else:
-                                    _sf_ts = _as_theil(_sf_xa, _sf_ya)
-
-                                st.session_state["sf_result"] = {
-                                    "feat": _sf_feat, "ctrl": _sf_ctrl if _sf_use_ctrl else None,
-                                    "n": _sf_n, "coef": _sf_coef, "se": _sf_se,
-                                    "tv": _sf_tv, "pv": _sf_pv,
-                                    "lo": _sf_lo, "hi": _sf_hi, "ci": _sf_ci_label,
-                                    "r2": _sf_r2, "adj_r2": _sf_adj_r2, "ts": _sf_ts,
-                                }
-
-                        if st.session_state.get("sf_result"):
-                            _sfr = st.session_state["sf_result"]
-                            _sig = _sfr["pv"] < (0.05 if _sfr["ci"] == "95%" else 0.10)
-                            st.divider()
-                            _sfc1, _sfc2, _sfc3, _sfc4 = st.columns(4)
-                            with _sfc1:
-                                st.metric("OLS Adj/Unit", f"${_sfr['coef']:,.0f}")
-                            with _sfc2:
-                                st.metric("Theil-Sen Adj/Unit", f"${_sfr['ts']:,.0f}" if _sfr["ts"] and not np.isnan(_sfr["ts"]) else "—")
-                            with _sfc3:
-                                st.metric(f"{_sfr['ci']} CI", f"${_sfr['lo']:,.0f} – ${_sfr['hi']:,.0f}")
-                            with _sfc4:
-                                st.metric("p-value", f"{_sfr['pv']:.4f}", delta="Sig ✅" if _sig else "Not sig —", delta_color="off")
-                            _sfc5, _sfc6, _sfc7 = st.columns(3)
-                            with _sfc5: st.metric("n (sales)", str(_sfr["n"]))
-                            with _sfc6: st.metric("R²", f"{_sfr['r2']:.4f}")
-                            with _sfc7: st.metric("Adj. R²", f"{_sfr['adj_r2']:.4f}")
-                            _ctrl_phrase = f" controlling for {_sfr['ctrl']}" if _sfr["ctrl"] else ""
-                            st.info(
-                                f"**{_sfr['feat']}**{_ctrl_phrase}: OLS indicates **${_sfr['coef']:,.0f} per unit** "
-                                f"({_sfr['ci']} CI: ${_sfr['lo']:,.0f} to ${_sfr['hi']:,.0f}). "
-                                + (f"Theil-Sen: **${_sfr['ts']:,.0f}/unit**. " if _sfr["ts"] and not np.isnan(_sfr["ts"]) else "")
-                                + f"Result is {'statistically significant' if _sig else 'not statistically significant'} "
-                                f"(p = {_sfr['pv']:.4f}) across {_sfr['n']} sales."
-                            )
-
-                        # ── SYNAPSE SENSITIVITY ANALYSIS ──────────────────────
-                        st.divider()
-                        st.markdown("#### Sensitivity Analysis")
-                        st.caption(
-                            "Finds the per-unit adjustment that minimises the spread of adjusted sale prices "
-                            "after all comps are adjusted to the subject's feature value — the Synapse method."
-                        )
-                        _sa2_col1, _sa2_col2 = st.columns(2)
-                        with _sa2_col1:
-                            _sa2_feat = st.selectbox(
-                                "Feature", options=_num_cols,
-                                index=_num_cols.index(_selected[0]) if _selected and _selected[0] in _num_cols else 0,
-                                key="sa2_feat",
-                            )
-                        with _sa2_col2:
-                            _sa2_subj = st.number_input(
-                                "Subject's value for this feature",
-                                value=0.0, step=1.0, format="%.1f", key="sa2_subj",
-                            )
-
-                        if st.button("▶ Run Sensitivity Analysis", key="sa2_run", use_container_width=True):
-                            _sa2_df = _df_v[[_sa2_feat, _AS_PRICE_COL]].copy()
-                            _sa2_df[_sa2_feat] = pd.to_numeric(_sa2_df[_sa2_feat], errors="coerce")
-                            _sa2_df = _sa2_df.dropna()
-                            _sa2_df = _sa2_df[_sa2_df[_AS_PRICE_COL] > 0]
-                            _sa2_n  = len(_sa2_df)
-                            if _sa2_n < 3:
-                                st.error(f"Need at least 3 sales with valid {_sa2_feat} values.")
-                            else:
-                                _sa2_xa = _sa2_df[_sa2_feat].values.astype(float)
-                                _sa2_ya = _sa2_df[_AS_PRICE_COL].values.astype(float)
-                                _sa2_opt, _sa2_range = _as_sensitivity(_sa2_xa, _sa2_ya, float(_sa2_subj))
-                                # Build chart: adjustment vs. price range
-                                _ts_est = _as_theil(_sa2_xa, _sa2_ya)
-                                _center = _ts_est if (_ts_est and not np.isnan(_ts_est)) else 0.0
-                                _half   = max(abs(_center) * 2.0, 500.0)
-                                _cands  = np.linspace(_center - _half, _center + _half, 300)
-                                _ranges = [float(np.max(_sa2_ya - (_sa2_xa - float(_sa2_subj)) * c)
-                                           - np.min(_sa2_ya - (_sa2_xa - float(_sa2_subj)) * c))
-                                           for c in _cands]
-                                _chart_df = pd.DataFrame({"Adj/unit ($)": _cands, "Price range ($)": _ranges})
-                                st.session_state["sa2_result"] = {
-                                    "feat": _sa2_feat, "subj": _sa2_subj,
-                                    "opt": _sa2_opt, "range": _sa2_range,
-                                    "n": _sa2_n, "chart": _chart_df,
-                                }
-
-                        if st.session_state.get("sa2_result"):
-                            _sa2r = st.session_state["sa2_result"]
-                            st.divider()
-                            _sa2c1, _sa2c2, _sa2c3 = st.columns(3)
-                            with _sa2c1: st.metric("Optimal Adj/Unit", f"${_sa2r['opt']:,.0f}")
-                            with _sa2c2: st.metric("Min Price Range", f"${_sa2r['range']:,.0f}")
-                            with _sa2c3: st.metric("n (sales)", str(_sa2r["n"]))
-                            st.info(
-                                f"For **{_sa2r['feat']}** with subject value **{_sa2r['subj']:,.1f}**: "
-                                f"an adjustment of **${_sa2r['opt']:,.0f}/unit** minimises the range of "
-                                f"adjusted sale prices to **${_sa2r['range']:,.0f}** across {_sa2r['n']} sales."
-                            )
-                            st.line_chart(_sa2r["chart"].set_index("Adj/unit ($)"),
-                                          y="Price range ($)", use_container_width=True)
-
-                        # Multiple OLS
-                        st.divider()
-                        st.markdown("#### Multiple OLS — All Selected Features Simultaneously")
-                        _mc = [
-                            c for c in _selected
-                            if pd.to_numeric(_df_v[c], errors="coerce").notna().sum() >= 4
-                        ]
-                        if len(_mc) >= 2:
-                            _dm = _df_v[[_AS_PRICE_COL] + _mc].copy()
-                            for _c in _mc:
-                                _dm[_c] = pd.to_numeric(_dm[_c], errors="coerce")
-                            _dm = _dm.dropna()
-                            _dm = _dm[_dm[_AS_PRICE_COL] > 0]
-                            if len(_dm) >= len(_mc) + 2:
-                                _ym = _dm[_AS_PRICE_COL].values.astype(float)
-                                _Xm = np.column_stack(
-                                    [np.ones(len(_ym))] + [_dm[c].values.astype(float) for c in _mc]
-                                )
-                                try:
-                                    _bm = np.linalg.solve(_Xm.T @ _Xm, _Xm.T @ _ym)
-                                except np.linalg.LinAlgError:
-                                    _bm = np.linalg.lstsq(_Xm, _ym, rcond=None)[0]
-                                _yh_m    = _Xm @ _bm
-                                _ssr_m   = np.sum((_ym - _yh_m) ** 2)
-                                _sst_m   = np.sum((_ym - np.mean(_ym)) ** 2)
-                                _r2m     = 1 - _ssr_m / _sst_m if _sst_m > 0 else 0.0
-                                _nm, _km = len(_ym), len(_mc)
-                                _adj_r2m = 1 - (1 - _r2m) * (_nm - 1) / (_nm - _km - 1) if _nm > _km + 1 else 0.0
-                                _msem    = _ssr_m / (_nm - _km - 1) if _nm > _km + 1 else 0.0
-                                _sem     = np.sqrt(np.diag(np.linalg.pinv(_Xm.T @ _Xm) * _msem))
-                                _coef_m  = []
-                                for _i, _lbl in enumerate(["Intercept"] + _mc):
-                                    _tv = _bm[_i] / _sem[_i] if _sem[_i] > 0 else 0.0
-                                    _pv = 2 * (1 - _scipy_stats.t.cdf(abs(_tv), df=max(_nm - _km - 1, 1)))
-                                    _coef_m.append({
-                                        "Variable":    _lbl,
-                                        "Coefficient": f"${_bm[_i]:,.2f}" if _i > 0 else f"${_bm[_i]:,.0f}",
-                                        "Std Error":   f"${_sem[_i]:,.2f}",
-                                        "t-stat":      f"{_tv:.3f}",
-                                        "p-value":     f"{_pv:.4f}",
-                                        "Sig":         "✅" if _pv < 0.05 else "—",
-                                    })
-                                st.dataframe(pd.DataFrame(_coef_m), use_container_width=True, hide_index=True)
-                                _mc1, _mc2, _mc3 = st.columns(3)
-                                with _mc1: st.metric("R²", f"{_r2m:.4f}")
-                                with _mc2: st.metric("Adj. R²", f"{_adj_r2m:.4f}")
-                                with _mc3: st.metric("n (sales)", str(_nm))
-                            else:
-                                st.info(
-                                    f"Not enough complete rows for multiple OLS "
-                                    f"({len(_dm)} available after dropping nulls, need ≥ {len(_mc)+2})."
-                                )
-                        else:
-                            st.info("Select at least 2 features for multiple OLS.")
-
-    else:
-        st.info("Upload a Synapse MLS comps CSV above to begin.")
-
-    # ── DEPRECIATED COST ──────────────────────────────────────────────────────
+    # ── Upload ────────────────────────────────────────────────────────────────
+    st.subheader("Adjustment Support")
+    st.caption("Upload RI Statewide MLS CSV exports to derive market-supported adjustments.")
     st.divider()
-    with st.expander("🏗️ Depreciated Cost — Manual Entry", expanded=False):
-        dc_col1, dc_col2 = st.columns(2)
-        with dc_col1:
-            st.markdown("**Feature Description**")
-            dc_feature = st.text_input(
-                "Feature being valued", value="In-Ground Pool",
-                key="dc_feature", placeholder="e.g. In-Ground Pool, Garage Stall, Deck"
-            )
-            dc_unit = st.text_input(
-                "Unit of measure", value="per unit",
-                key="dc_unit", placeholder="e.g. per SF, per stall, per unit"
-            )
-            dc_cost_new = st.number_input(
-                "Cost new ($)", value=45000, step=1000, min_value=0,
-                key="dc_cost_new", format="%d",
-            )
 
-        with dc_col2:
-            st.markdown("**Depreciation**")
-            dc_phys_pct = st.number_input(
-                "Physical depreciation (%)", value=20.0, min_value=0.0, max_value=100.0,
-                step=1.0, format="%.1f", key="dc_phys_pct",
-            )
-            dc_func_pct = st.number_input(
-                "Functional obsolescence (%)", value=0.0, min_value=0.0, max_value=100.0,
-                step=1.0, format="%.1f", key="dc_func_pct",
-            )
-            dc_ext_pct = st.number_input(
-                "External obsolescence (%)", value=0.0, min_value=0.0, max_value=100.0,
-                step=1.0, format="%.1f", key="dc_ext_pct",
-            )
+    _uc1, _uc2 = st.columns(2)
+    with _uc1:
+        _t8_f1 = st.file_uploader("Dataset 1 CSV", type=["csv"], key="t8_f1")
+    with _uc2:
+        _t8_f2 = st.file_uploader("Dataset 2 CSV (optional)", type=["csv"], key="t8_f2")
 
+    _t8_raw1 = _t8_load(_t8_f1) if _t8_f1 else None
+    _t8_raw2 = _t8_load(_t8_f2) if _t8_f2 else None
+
+    if _t8_raw1 is None and _t8_raw2 is None:
+        st.info("Upload at least one MLS CSV to begin.")
+    else:
+        _t8_d1 = _t8_prep(_t8_raw1) if _t8_raw1 is not None else None
+        _t8_d2 = _t8_prep(_t8_raw2) if _t8_raw2 is not None else None
+        _t8_pool = pd.concat([d for d in [_t8_d1, _t8_d2] if d is not None], ignore_index=True)
+
+        # ── Filters ──────────────────────────────────────────────────────────
+        st.markdown("### Filters")
+        _flc1, _flc2, _flc3 = st.columns(3)
+
+        with _flc1:
+            _has_dt = _DT in _t8_pool.columns and _t8_pool[_DT].notna().any()
+            if _has_dt:
+                _dt_min = _t8_pool[_DT].min().date()
+                _dt_max = _t8_pool[_DT].max().date()
+                _dt_range = st.date_input("Closed Date range",
+                    value=(_dt_min, _dt_max), min_value=_dt_min,
+                    max_value=_dt_max, key="t8_dt")
+            else:
+                _dt_range = None
+                st.caption("No Closed Date column found.")
+
+        with _flc2:
+            _pr_vals = _t8_pool[_P].dropna()
+            if len(_pr_vals) > 0:
+                _pr_lo = int(_pr_vals.min()); _pr_hi = int(_pr_vals.max())
+                _pr_range = st.slider("Sale Price ($)", _pr_lo, _pr_hi,
+                    (_pr_lo, _pr_hi), step=5000, format="$%d", key="t8_pr")
+            else:
+                _pr_range = None
+
+        with _flc3:
+            _city_col = next((c for c in ["City","city","Municipality","Town","Neighborhood"]
+                              if c in _t8_pool.columns), None)
+            if _city_col:
+                _all_cities = sorted(_t8_pool[_city_col].dropna().unique().tolist())
+                _sel_cities = st.multiselect("City / Municipality", _all_cities,
+                    default=_all_cities, key="t8_cities")
+            else:
+                _sel_cities = None
+
+        _t8_deduct = st.checkbox(
+            "Deduct seller concessions (Seller Paid) from sale price before analysis",
+            value=False, key="t8_deduct",
+            disabled=_SP not in _t8_pool.columns,
+        )
         st.divider()
-        dc_qty_col1, dc_qty_col2 = st.columns(2)
-        with dc_qty_col1:
-            dc_quantity = st.number_input(
-                "Quantity", value=1, min_value=1, step=1, key="dc_quantity",
-            )
-        with dc_qty_col2:
-            dc_mkt_factor = st.number_input(
-                "Market acceptance factor (%)", value=100.0, min_value=0.0, max_value=200.0,
-                step=5.0, format="%.0f", key="dc_mkt_factor",
-            )
 
-        if st.button("Calculate Depreciated Cost", key="dc_run", use_container_width=True):
-            cost_new_total = dc_cost_new * dc_quantity
-            phys_dep       = cost_new_total * (dc_phys_pct / 100.0)
-            func_obs       = cost_new_total * (dc_func_pct / 100.0)
-            ext_obs        = cost_new_total * (dc_ext_pct  / 100.0)
-            total_dep      = phys_dep + func_obs + ext_obs
-            depreciated    = cost_new_total - total_dep
-            mkt_adjusted   = depreciated * (dc_mkt_factor / 100.0)
-            per_unit_res   = mkt_adjusted / dc_quantity if dc_quantity > 0 else 0
+        def _apply_filters(df):
+            if df is None or len(df) == 0: return df
+            d = df.copy()
+            if _pr_range and _P in d.columns:
+                d = d[(d[_P] >= _pr_range[0]) & (d[_P] <= _pr_range[1])]
+            if _dt_range and len(_dt_range) == 2 and _DT in d.columns:
+                d = d[(d[_DT].dt.date >= _dt_range[0]) & (d[_DT].dt.date <= _dt_range[1])]
+            if _sel_cities and _city_col and _city_col in d.columns:
+                d = d[d[_city_col].isin(_sel_cities)]
+            if _t8_deduct and _SP in d.columns:
+                d = d.copy()
+                d[_P] = (d[_P] - d[_SP].fillna(0.0)).clip(lower=0)
+            return d.reset_index(drop=True)
 
+        _t8_d1f = _apply_filters(_t8_d1)
+        _t8_d2f = _apply_filters(_t8_d2)
+        _t8_daf = pd.concat([d for d in [_t8_d1f, _t8_d2f] if d is not None], ignore_index=True)
+
+        # ── Row exclusion ─────────────────────────────────────────────────────
+        st.markdown("### Exclude Individual Sales")
+        _show_cols = [c for c in [_P, _GLA, _LOT, _FB, _HB, _BD, _GS, _FP, _PL, _DT]
+                      if c in _t8_daf.columns]
+        _excl_base = _t8_daf[_show_cols].copy()
+        _excl_base[_P] = _excl_base[_P].apply(lambda v: f"${v:,.0f}" if pd.notna(v) else "")
+        _excl_base.insert(0, "Include", True)
+        _excl_edited = st.data_editor(
+            _excl_base, use_container_width=True, hide_index=True,
+            key="t8_excl", height=220,
+            column_config={"Include": st.column_config.CheckboxColumn("Include", default=True)},
+        )
+        _inc_mask = _excl_edited["Include"].values.astype(bool)
+        _n1f = len(_t8_d1f) if _t8_d1f is not None else 0
+        _n2f = len(_t8_d2f) if _t8_d2f is not None else 0
+        _t8_d1x = _t8_d1f[_inc_mask[:_n1f]].reset_index(drop=True) if _t8_d1f is not None else None
+        _t8_d2x = _t8_d2f[_inc_mask[_n1f:_n1f+_n2f]].reset_index(drop=True) if _t8_d2f is not None else None
+        _t8_dax  = pd.concat([d for d in [_t8_d1x, _t8_d2x] if d is not None], ignore_index=True)
+
+        st.caption(
+            f"**DS1:** {len(_t8_d1x) if _t8_d1x is not None else 0} sales  |  "
+            f"**DS2:** {len(_t8_d2x) if _t8_d2x is not None else 0} sales  |  "
+            f"**Combined:** {len(_t8_dax)} sales  (after filters + exclusions)"
+        )
+        st.divider()
+
+        # ── Subject property ──────────────────────────────────────────────────
+        st.markdown("### Subject Property Values")
+        st.caption("Used in the export addendum text.")
+        _sp_cols = st.columns(5)
+        _subj = {}
+        _sp_num_feats = [_GLA, _LOT, _FB, _HB, _BD, _GS, _FP]
+        for _si, _sf in enumerate(_sp_num_feats):
+            with _sp_cols[_si % 5]:
+                _subj[_sf] = st.number_input(FEAT_LABEL[_sf], value=0.0,
+                    step=1.0, format="%.0f", key=f"t8_s_{_sf}")
+        with _sp_cols[2]:
+            _pl_sel = st.selectbox("Pool", ["No (0)", "Yes (1)"], key="t8_s_pl")
+            _subj[_PL] = 1.0 if "Yes" in _pl_sel else 0.0
+        st.divider()
+
+        # ── Run Analysis ──────────────────────────────────────────────────────
+        if st.button("▶ Run Analysis", key="t8_run", use_container_width=True, type="primary"):
+            with st.spinner("Computing all methods — this may take a moment for Paired Sales..."):
+                _computed = {}
+                for _feat in ALL_FEATS:
+                    _r1 = _run_feat(_t8_d1x, _feat)
+                    _r2 = _run_feat(_t8_d2x, _feat)
+                    _ra = _run_feat(_t8_dax,  _feat)
+                    _pm, _pav, _pn, _pr_n = _t8_paired(_t8_dax, _feat)
+                    _computed[_feat] = {
+                        "ds1": _r1, "ds2": _r2, "all": _ra,
+                        "paired_med": _pm, "paired_avg": _pav,
+                        "paired_n": _pn, "paired_raw": _pr_n,
+                    }
+            st.session_state["t8_res"] = _computed
+            st.success("Analysis complete.")
+
+        # ── Results ───────────────────────────────────────────────────────────
+        if st.session_state.get("t8_res"):
+            _res = st.session_state["t8_res"]
             st.divider()
-            st.markdown("#### Results")
-            rc1, rc2, rc3 = st.columns(3)
-            with rc1:
-                st.metric("Cost New (total)",      f"${cost_new_total:,.0f}")
-                st.metric("Physical Depreciation", f"−${phys_dep:,.0f}")
-            with rc2:
-                st.metric("Functional Obsolescence", f"−${func_obs:,.0f}")
-                st.metric("External Obsolescence",   f"−${ext_obs:,.0f}")
-            with rc3:
-                st.metric("Depreciated Cost",    f"${depreciated:,.0f}")
-                st.metric("Mkt-Adjusted Value",  f"${mkt_adjusted:,.0f}")
+            st.markdown("### Results")
 
+            # Summary table
+            _tbl = []
+            for _feat in ALL_FEATS:
+                if _feat not in _res: continue
+                _rv   = _res[_feat]
+                _ft   = FEAT_TYPE[_feat]
+                _ra   = _rv.get("all")  or {}
+                _r1   = _rv.get("ds1")  or {}
+                _r2   = _rv.get("ds2")  or {}
+                _pm   = _rv.get("paired_med", np.nan)
+                _pav  = _rv.get("paired_avg", np.nan)
+                _pn   = _rv.get("paired_n",   0)
+
+                def _g(d): return d.get("grp", np.nan) if d else np.nan
+                def _o(d): return d.get("ols", np.nan) if d else np.nan
+                def _th(d): return d.get("theil", np.nan) if d else np.nan
+                def _nd(d): return d.get("n", 0) if d else 0
+
+                all_m = [v for v in [_pm, _g(_r1), _g(_r2), _g(_ra), _o(_ra), _th(_ra)]
+                         if not (isinstance(v, float) and np.isnan(v))]
+                lo_v  = min(all_m) if all_m else np.nan
+                hi_v  = max(all_m) if all_m else np.nan
+                sug   = float(np.median(all_m)) if all_m else np.nan
+                flag  = "⚠️ Low n" if (_nd(_ra) < 5 and _pn < 5) else ""
+
+                _tbl.append({
+                    "Feature":       FEAT_LABEL[_feat],
+                    "n (All)":       _nd(_ra),
+                    "Paired Med":    _fv(_pm),
+                    "Paired Avg":    _fv(_pav),
+                    "Pairs (n)":     str(_pn) if _pn > 0 else "—",
+                    "Grp DS1":       _fv(_g(_r1)),
+                    "Grp DS2":       _fv(_g(_r2)),
+                    "Grp All":       _fv(_g(_ra)),
+                    "OLS All":       _fv(_o(_ra))  if _ft == "continuous" else "—",
+                    "TS All":        _fv(_th(_ra)) if _ft == "continuous" else "—",
+                    "Range":         f"{_fv(lo_v)} to {_fv(hi_v)}" if not np.isnan(lo_v) else "—",
+                    "Suggested":     _fv(sug),
+                    "Flag":          flag,
+                })
+
+            st.dataframe(pd.DataFrame(_tbl), use_container_width=True, hide_index=True)
+            st.caption(
+                "**Paired Med/Avg**: all pairwise slopes with Synapse matching criteria + 1.5-IQR filter. "
+                "**Grp**: median price comparison between groups. "
+                "**OLS/TS**: regression slope (continuous features only). "
+                "**Suggested**: median of all method results. ⚠️ = fewer than 5 data points."
+            )
+
+            # Detail expanders
+            st.markdown("#### Feature Detail")
+            for _feat in ALL_FEATS:
+                if _feat not in _res: continue
+                _rv = _res[_feat]
+                _ft = FEAT_TYPE[_feat]
+                with st.expander(f"{FEAT_LABEL[_feat]}"):
+                    _dc1, _dc2, _dc3 = st.columns(3)
+                    for _di, (_dlbl, _dd) in enumerate([
+                        ("Dataset 1", _rv.get("ds1")),
+                        ("Dataset 2", _rv.get("ds2")),
+                        ("Combined",  _rv.get("all")),
+                    ]):
+                        with [_dc1, _dc2, _dc3][_di]:
+                            _nn = _dd.get("n", 0) if _dd else 0
+                            st.markdown(f"**{_dlbl}** — n = {_nn}")
+                            if not _dd or _nn < 2:
+                                st.caption("Insufficient data.")
+                            elif _ft == "continuous":
+                                st.metric("OLS",       _fv(_dd.get("ols")))
+                                st.metric("Theil-Sen", _fv(_dd.get("theil")))
+                                _gv = _dd.get("grp", np.nan)
+                                _gn = _dd.get("grp_n", (0, 0))
+                                st.metric(f"Grouped (n={_gn[0]}/{_gn[1]})", _fv(_gv))
+                            elif _ft == "count":
+                                _cnt = _dd.get("grp_count", [])
+                                if _cnt:
+                                    for _cv, _cn0, _cn1, _lv, _hv in _cnt:
+                                        st.metric(
+                                            f"{int(_lv)} vs {int(_hv)} bath/unit "
+                                            f"(n={_cn0}/{_cn1})",
+                                            _fv(_cv),
+                                        )
+                                    _vals2 = [v[0] for v in _cnt if not np.isnan(v[0])]
+                                    if len(_vals2) > 1:
+                                        st.metric("Average of above", _fv(float(np.mean(_vals2))))
+                                else:
+                                    st.caption("No adjacent-count pairs found.")
+                            else:  # binary
+                                _bv = _dd.get("grp", np.nan)
+                                _bn = _dd.get("grp_n", (0, 0))
+                                st.metric(f"Without (n={_bn[0]}) vs With (n={_bn[1]})", _fv(_bv))
+
+                    st.markdown("---")
+                    _ppc1, _ppc2, _ppc3 = st.columns(3)
+                    with _ppc1:
+                        st.metric("Paired Median",
+                                  _fv(_rv.get("paired_med")))
+                    with _ppc2:
+                        st.metric("Paired Average",
+                                  _fv(_rv.get("paired_avg")))
+                    with _ppc3:
+                        st.metric(f"Pairs used / raw",
+                                  f"{_rv.get('paired_n',0)} / {_rv.get('paired_raw',0)}")
+
+            # ── Chosen adjustments ────────────────────────────────────────────
             st.divider()
-            total_dep_pct = (total_dep / cost_new_total * 100) if cost_new_total > 0 else 0
+            st.markdown("### Choose Adjustments")
+            st.caption("Pre-filled with the median of all method results. Edit to your chosen value.")
+            _ch_cols = st.columns(3)
+            _chosen = {}
+            for _ci, _feat in enumerate(ALL_FEATS):
+                with _ch_cols[_ci % 3]:
+                    _rv = _res.get(_feat, {})
+                    _ra = _rv.get("all") or {}
+                    _pm = _rv.get("paired_med", np.nan)
+                    _avm = [v for v in [_pm, _ra.get("grp", np.nan),
+                                        _ra.get("ols", np.nan), _ra.get("theil", np.nan)]
+                            if isinstance(v, float) and not np.isnan(v)]
+                    _sug_v = float(np.median(_avm)) if _avm else 0.0
+                    _rounded = float(round(_sug_v / 500) * 500) if _sug_v != 0 else 0.0
+                    _chosen[_feat] = st.number_input(
+                        FEAT_LABEL[_feat], value=_rounded,
+                        step=500.0, format="%.0f", key=f"t8_ch_{_feat}",
+                    )
+
+            # ── Export ────────────────────────────────────────────────────────
+            st.divider()
+            st.markdown("### Export")
+            _exp1, _exp2 = st.columns(2)
+
+            with _exp1:
+                if st.button("Generate Addendum Text", key="t8_gen", use_container_width=True):
+                    _lines = ["ADJUSTMENT SUPPORT — MARKET ANALYSIS ADDENDUM", ""]
+                    for _feat in ALL_FEATS:
+                        _adj = _chosen.get(_feat, 0.0)
+                        if _adj == 0.0: continue
+                        _lbl  = FEAT_LABEL[_feat]
+                        _ft   = FEAT_TYPE[_feat]
+                        _rv   = _res.get(_feat, {})
+                        _ra   = _rv.get("all") or {}
+                        _n_used = _ra.get("n", 0)
+                        _mlist = "paired sales"
+                        if _ft == "continuous":
+                            _mlist += ", grouped data, OLS regression, and Theil-Sen regression"
+                        else:
+                            _mlist += " and grouped data analysis"
+                        _subj_note = ""
+                        if _subj.get(_feat, 0) != 0:
+                            _subj_note = (f" The subject property has a {_lbl.lower()} of "
+                                         f"{_subj[_feat]:,.0f}.")
+                        _lines.append(
+                            f"{_lbl} adjustments were determined at ${abs(_adj):,.0f} per unit, "
+                            f"derived from {_mlist} across {_n_used} comparable sales.{_subj_note} "
+                            f"This adjustment is considered reflective of the market's reaction to "
+                            f"{_lbl.lower()} differences in this market segment."
+                        )
+                    st.session_state["t8_addendum"] = "\n\n".join(_lines)
+
+            with _exp2:
+                _exp_rows = []
+                for _feat in ALL_FEATS:
+                    _rv = _res.get(_feat, {})
+                    _ra = _rv.get("all") or {}
+                    _exp_rows.append({
+                        "Feature":          FEAT_LABEL[_feat],
+                        "Type":             FEAT_TYPE[_feat],
+                        "Chosen Adj ($)":   _chosen.get(_feat, 0),
+                        "Subject Value":    _subj.get(_feat, ""),
+                        "n (Combined)":     _ra.get("n", 0),
+                        "Paired Med":       _rv.get("paired_med", ""),
+                        "Paired Avg":       _rv.get("paired_avg", ""),
+                        "Pairs Used":       _rv.get("paired_n", 0),
+                        "Grouped DS1":      (_rv.get("ds1") or {}).get("grp", ""),
+                        "Grouped DS2":      (_rv.get("ds2") or {}).get("grp", ""),
+                        "Grouped All":      _ra.get("grp", ""),
+                        "OLS All":          _ra.get("ols", ""),
+                        "TS All":           _ra.get("theil", ""),
+                    })
+                _csv_bytes = pd.DataFrame(_exp_rows).to_csv(index=False).encode()
+                st.download_button(
+                    "Download Adjustments CSV", data=_csv_bytes,
+                    file_name="adjustment_support.csv", mime="text/csv",
+                    use_container_width=True, key="t8_dl",
+                )
+
+            if st.session_state.get("t8_addendum"):
+                st.text_area("Addendum Text — copy to workfile",
+                             value=st.session_state["t8_addendum"],
+                             height=320, key="t8_textarea")
+
+    # ── Depreciated Cost ──────────────────────────────────────────────────────
+    st.divider()
+    with st.expander("Depreciated Cost", expanded=False):
+        st.markdown("#### Depreciated Cost — Feature Valuation")
+        _dcc1, _dcc2 = st.columns(2)
+        with _dcc1:
+            st.markdown("**Depreciation Parameters**")
+            _dc_eff_age  = st.number_input("Effective Age (years)", value=15, min_value=0, step=1, key="dc2_ea")
+            _dc_econ_lif = st.number_input("Economic Life (years)", value=60, min_value=1,  step=1, key="dc2_el")
+            _dc_dep_rate = _dc_eff_age / _dc_econ_lif
+            st.metric("Physical Depreciation Rate", f"{_dc_dep_rate*100:.1f}%")
+        with _dcc2:
+            st.markdown("**GLA Depreciated Cost**")
+            _dc_cost_sf  = st.number_input("Cost per SF ($ new)", value=120.0, step=5.0, format="%.2f", key="dc2_csf")
+            _dc_subj_sf  = st.number_input("Subject GLA (SF)", value=1800, step=50, key="dc2_ssf")
+        st.divider()
+        if st.button("Calculate GLA Depreciated Cost (±300 SF)", key="dc2_gla", use_container_width=True):
+            for _sf in [_dc_subj_sf - 300, _dc_subj_sf, _dc_subj_sf + 300]:
+                _tc   = _dc_cost_sf * _sf
+                _dep  = _tc * _dc_dep_rate
+                _depc = _tc - _dep
+                st.info(f"**{_sf:,} SF** — Cost new: ${_tc:,.0f} → "
+                        f"Depreciation {_dc_dep_rate*100:.1f}%: −${_dep:,.0f} → "
+                        f"Depreciated: **${_depc:,.0f}** (${_depc/_sf:,.2f}/SF)")
+            _lo_dc  = _dc_cost_sf * (_dc_subj_sf - 300) * (1 - _dc_dep_rate)
+            _hi_dc  = _dc_cost_sf * (_dc_subj_sf + 300) * (1 - _dc_dep_rate)
+            _per_sf = (_hi_dc - _lo_dc) / 600.0
+            st.success(f"Indicated GLA adjustment: **${_per_sf:,.2f}/SF** (depreciated cost method)")
+        st.divider()
+        st.markdown("**Individual Feature Depreciated Cost**")
+        _dcf1, _dcf2 = st.columns(2)
+        with _dcf1:
+            _dc_feat_nm  = st.text_input("Feature name", value="Full Bath", key="dc2_fn")
+            _dc_feat_cost = st.number_input("Cost to build ($ new)", value=12000, step=500, key="dc2_fc")
+        with _dcf2:
+            _dc_qty      = st.number_input("Quantity", value=1, min_value=1, step=1, key="dc2_qty")
+            _dc_add_dep  = st.number_input("Additional depreciation % (optional)", value=0.0,
+                                            min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="dc2_adp")
+        if st.button("Calculate Feature Depreciated Cost", key="dc2_feat", use_container_width=True):
+            _total_dep_r = min(_dc_dep_rate + _dc_add_dep / 100.0, 1.0)
+            _total_cost  = _dc_feat_cost * _dc_qty
+            _depr_val    = _total_cost * (1.0 - _total_dep_r)
             st.success(
-                f"**{dc_feature}** — {dc_quantity} × {dc_unit}: "
-                f"Cost new ${cost_new_total:,.0f} → "
-                f"total depreciation {total_dep_pct:.1f}% (${total_dep:,.0f}) → "
-                f"depreciated cost ${depreciated:,.0f} → "
-                f"market-adjusted @ {dc_mkt_factor:.0f}%: **${mkt_adjusted:,.0f}** "
-                f"(${per_unit_res:,.0f} {dc_unit})."
+                f"**{_dc_feat_nm}** ({_dc_qty} unit(s)): "
+                f"Cost new ${_total_cost:,.0f} × "
+                f"(1 − {_total_dep_r*100:.1f}%) = "
+                f"**${_depr_val:,.0f}** depreciated value "
+                f"(${_depr_val/_dc_qty:,.0f} per unit)."
             )
-            dep_df = pd.DataFrame([
-                {"Component": "Cost New",                f"Amount": f"${cost_new_total:,.0f}", "% of Cost New": "100.0%"},
-                {"Component": "Physical Depreciation",   "Amount": f"−${phys_dep:,.0f}",      "% of Cost New": f"{dc_phys_pct:.1f}%"},
-                {"Component": "Functional Obsolescence", "Amount": f"−${func_obs:,.0f}",      "% of Cost New": f"{dc_func_pct:.1f}%"},
-                {"Component": "External Obsolescence",   "Amount": f"−${ext_obs:,.0f}",       "% of Cost New": f"{dc_ext_pct:.1f}%"},
-                {"Component": "Depreciated Cost",        "Amount": f"${depreciated:,.0f}",    "% of Cost New": f"{100-total_dep_pct:.1f}%"},
-                {"Component": f"Market Acceptance ({dc_mkt_factor:.0f}%)", "Amount": f"${mkt_adjusted:,.0f}",
-                 "% of Cost New": f"{mkt_adjusted/cost_new_total*100 if cost_new_total else 0:.1f}%"},
-            ])
-            st.dataframe(dep_df, use_container_width=True, hide_index=True)
-
