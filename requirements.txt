@@ -1,7 +1,7 @@
-1 streamlit
-  2 pandas
-  3 Pillow
-  4 reportlab
-  5 numpy
-  6 scipy
-  7 PyMuPDF
+streamlit
+pandas
+Pillow
+reportlab
+numpy
+scipy
+PyMuPDF
