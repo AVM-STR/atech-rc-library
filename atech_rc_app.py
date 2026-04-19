@@ -2381,6 +2381,11 @@ with tab8:
 
     _AS_PRICE_COL      = "Sold Price"
     _AS_YEAR_BUILT     = "Year Built"
+    _AS_GLA_COL        = "Apx Abv Gr LivSF"
+    _AS_CTRL_NEEDED    = {
+        "Baths Total", "Baths Full", "Baths Half",
+        "Beds Total", "Garage Spaces", "Number Of Fireplaces",
+    }
     _AS_DEFAULT_FEATURES = [
         "Apx Abv Gr LivSF",
         "Approx Lot Square Foot",
@@ -2461,6 +2466,72 @@ with tab8:
             return "⚠️ Moderate"
         return "🔴 Sensitive"
 
+    def _as_ols_ctrl(x_arr, ctrl_arr, y_arr):
+        """OLS: y ~ intercept + ctrl + x. Returns (x_coef, r2, se_x)."""
+        X = np.column_stack([np.ones(len(y_arr)), ctrl_arr, x_arr])
+        try:
+            beta = np.linalg.solve(X.T @ X, X.T @ y_arr)
+        except np.linalg.LinAlgError:
+            beta = np.linalg.lstsq(X, y_arr, rcond=None)[0]
+        yhat   = X @ beta
+        ss_res = np.sum((y_arr - yhat) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
+        r2     = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        n, k   = len(y_arr), 2
+        mse    = ss_res / (n - k - 1) if n > k + 1 else 0.0
+        se     = np.sqrt(np.diag(np.linalg.pinv(X.T @ X) * mse))
+        return beta[2], r2, se[2]
+
+    def _as_theil_ctrl(x_arr, ctrl_arr, y_arr):
+        """Theil-Sen after partialing out ctrl via OLS residuals (Frisch-Waugh)."""
+        if len(x_arr) < 4:
+            return np.nan
+        Xc = np.column_stack([np.ones(len(y_arr)), ctrl_arr])
+        b_y   = np.linalg.lstsq(Xc, y_arr, rcond=None)[0]
+        y_res = y_arr - Xc @ b_y
+        b_x   = np.linalg.lstsq(Xc, x_arr, rcond=None)[0]
+        x_res = x_arr - Xc @ b_x
+        if np.std(x_res) < 1e-10:
+            return np.nan
+        return _scipy_stats.theilslopes(y_res, x_res).slope
+
+    def _as_grp_ctrl(x_arr, ctrl_arr, y_arr):
+        """Grouped avg/med on GLA-residualized price."""
+        if len(x_arr) < 4:
+            return np.nan, np.nan
+        Xc    = np.column_stack([np.ones(len(y_arr)), ctrl_arr])
+        b_y   = np.linalg.lstsq(Xc, y_arr, rcond=None)[0]
+        y_res = y_arr - Xc @ b_y
+        med_x = np.median(x_arr)
+        glo   = y_res[x_arr <= med_x]
+        ghi   = y_res[x_arr >  med_x]
+        if len(glo) < 2 or len(ghi) < 2:
+            return np.nan, np.nan
+        xgap = np.median(x_arr[x_arr > med_x]) - np.median(x_arr[x_arr <= med_x])
+        if xgap == 0:
+            return np.nan, np.nan
+        return (np.mean(ghi) - np.mean(glo)) / xgap, (np.median(ghi) - np.median(glo)) / xgap
+
+    def _as_loo_ctrl(x_arr, ctrl_arr, y_arr):
+        """LOO sensitivity using GLA-controlled OLS and Theil-Sen."""
+        ols_v, ts_v = [], []
+        for i in range(len(x_arr)):
+            mask = np.ones(len(x_arr), dtype=bool)
+            mask[i] = False
+            xl, cl, yl = x_arr[mask], ctrl_arr[mask], y_arr[mask]
+            if len(xl) < 4:
+                continue
+            ols_v.append(_as_ols_ctrl(xl, cl, yl)[0])
+            ts_v.append(_as_theil_ctrl(xl, cl, yl))
+        ols_v = [v for v in ols_v if not np.isnan(v)]
+        ts_v  = [v for v in ts_v  if not np.isnan(v)]
+        return (
+            min(ols_v) if ols_v else np.nan,
+            max(ols_v) if ols_v else np.nan,
+            min(ts_v)  if ts_v  else np.nan,
+            max(ts_v)  if ts_v  else np.nan,
+        )
+
     # ── MAIN ANALYSIS ─────────────────────────────────────────────────────────
     if comps_file is not None:
         _df_comps_raw = _load_synapse_csv(comps_file)
@@ -2512,42 +2583,74 @@ with tab8:
                 else:
                     if st.button("▶ Run All Methods", key="as_run_all", use_container_width=True, type="primary"):
                         _rows = []
-                        for _feat in _selected:
-                            _pair = _df_v[[_feat, _AS_PRICE_COL]].copy()
-                            _pair[_feat] = pd.to_numeric(_pair[_feat], errors="coerce")
-                            _pair = _pair.dropna()
-                            _pair = _pair[_pair[_AS_PRICE_COL] > 0]
-                            _nf   = len(_pair)
-                            if _nf < 4:
-                                _rows.append({
-                                    "Feature": _feat, "n": _nf,
-                                    "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
-                                    "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
-                                    "LOO Min": "—", "LOO Max": "—", "Stability": "—",
-                                })
-                                continue
-                            _xa = _pair[_feat].values.astype(float)
-                            _ya = _pair[_AS_PRICE_COL].values.astype(float)
-                            _ols_s, _, _r2, _ = _as_ols1(_xa, _ya)
-                            _ts_s             = _as_theil(_xa, _ya)
-                            _lo, _hi, _, _    = _as_loo(_xa, _ya)
-                            _stab             = _as_stability(_ols_s, _lo, _hi)
-                            _med_x = np.median(_xa)
-                            _glo   = _ya[_xa <= _med_x]
-                            _ghi   = _ya[_xa >  _med_x]
-                            if len(_glo) >= 2 and len(_ghi) >= 2:
-                                _xgap  = np.median(_xa[_xa > _med_x]) - np.median(_xa[_xa <= _med_x])
-                                _g_avg = (np.mean(_ghi)   - np.mean(_glo))   / _xgap if _xgap else np.nan
-                                _g_med = (np.median(_ghi) - np.median(_glo)) / _xgap if _xgap else np.nan
-                            else:
-                                _g_avg, _g_med = np.nan, np.nan
+                        _gla_avail = _AS_GLA_COL in _df_v.columns
 
-                            def _fmtv(v):
-                                return f"${v:,.2f}" if not np.isnan(v) else "—"
+                        def _fmtv(v):
+                            return f"${v:,.2f}" if (v is not None and not np.isnan(v)) else "—"
+
+                        for _feat in _selected:
+                            _use_ctrl = _feat in _AS_CTRL_NEEDED and _gla_avail
+
+                            if _use_ctrl:
+                                _cols3 = [_feat, _AS_PRICE_COL, _AS_GLA_COL]
+                                _trip  = _df_v[_cols3].copy()
+                                _trip[_feat]       = pd.to_numeric(_trip[_feat],       errors="coerce")
+                                _trip[_AS_GLA_COL] = pd.to_numeric(_trip[_AS_GLA_COL], errors="coerce")
+                                _trip = _trip.dropna()
+                                _trip = _trip[(_trip[_AS_PRICE_COL] > 0) & (_trip[_AS_GLA_COL] > 0)]
+                                _nf   = len(_trip)
+                                _ctrl_label = "GLA"
+                                if _nf < 5:
+                                    _rows.append({
+                                        "Feature": _feat, "n": _nf, "Control": _ctrl_label,
+                                        "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
+                                        "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
+                                        "LOO Min": "—", "LOO Max": "—", "Stability": "—",
+                                    })
+                                    continue
+                                _xa = _trip[_feat].values.astype(float)
+                                _ya = _trip[_AS_PRICE_COL].values.astype(float)
+                                _ca = _trip[_AS_GLA_COL].values.astype(float)
+                                _ols_s, _r2, _    = _as_ols_ctrl(_xa, _ca, _ya)
+                                _ts_s             = _as_theil_ctrl(_xa, _ca, _ya)
+                                _lo, _hi, _, _    = _as_loo_ctrl(_xa, _ca, _ya)
+                                _stab             = _as_stability(_ols_s, _lo, _hi)
+                                _g_avg, _g_med    = _as_grp_ctrl(_xa, _ca, _ya)
+                            else:
+                                _pair = _df_v[[_feat, _AS_PRICE_COL]].copy()
+                                _pair[_feat] = pd.to_numeric(_pair[_feat], errors="coerce")
+                                _pair = _pair.dropna()
+                                _pair = _pair[_pair[_AS_PRICE_COL] > 0]
+                                _nf   = len(_pair)
+                                _ctrl_label = "—"
+                                if _nf < 4:
+                                    _rows.append({
+                                        "Feature": _feat, "n": _nf, "Control": _ctrl_label,
+                                        "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
+                                        "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
+                                        "LOO Min": "—", "LOO Max": "—", "Stability": "—",
+                                    })
+                                    continue
+                                _xa = _pair[_feat].values.astype(float)
+                                _ya = _pair[_AS_PRICE_COL].values.astype(float)
+                                _ols_s, _, _r2, _ = _as_ols1(_xa, _ya)
+                                _ts_s             = _as_theil(_xa, _ya)
+                                _lo, _hi, _, _    = _as_loo(_xa, _ya)
+                                _stab             = _as_stability(_ols_s, _lo, _hi)
+                                _med_x = np.median(_xa)
+                                _glo   = _ya[_xa <= _med_x]
+                                _ghi   = _ya[_xa >  _med_x]
+                                if len(_glo) >= 2 and len(_ghi) >= 2:
+                                    _xgap  = np.median(_xa[_xa > _med_x]) - np.median(_xa[_xa <= _med_x])
+                                    _g_avg = (np.mean(_ghi)   - np.mean(_glo))   / _xgap if _xgap else np.nan
+                                    _g_med = (np.median(_ghi) - np.median(_glo)) / _xgap if _xgap else np.nan
+                                else:
+                                    _g_avg, _g_med = np.nan, np.nan
 
                             _rows.append({
                                 "Feature":            _feat,
                                 "n":                  _nf,
+                                "Control":            _ctrl_label,
                                 "OLS ($/unit)":       _fmtv(_ols_s),
                                 "Theil-Sen ($/unit)": _fmtv(_ts_s),
                                 "Grp Avg ($/unit)":   _fmtv(_g_avg),
@@ -2563,9 +2666,11 @@ with tab8:
                         st.divider()
                         st.markdown("#### Results — All Methods Side-by-Side")
                         st.caption(
-                            "OLS and Theil-Sen are per-unit regression slopes. "
-                            "Grp Avg / Grp Med split sales at the feature median and normalize by the median group gap. "
-                            "LOO Min/Max are the OLS slope range from leave-one-out sensitivity analysis."
+                            "**Control = GLA**: count features (baths, beds, garage, fireplaces) are GLA-controlled — "
+                            "OLS runs as Price ~ GLA + Feature; Theil-Sen and grouped methods use GLA-residualized prices "
+                            "(Frisch-Waugh), isolating the feature contribution independent of house size. "
+                            "All other features use simple bivariate methods. "
+                            "LOO Min/Max are the OLS slope range from leave-one-out sensitivity."
                         )
                         st.dataframe(pd.DataFrame(_res), use_container_width=True, hide_index=True)
 
