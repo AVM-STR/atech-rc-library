@@ -2351,486 +2351,285 @@ with tab8:
     from scipy import stats as _scipy_stats
 
     st.subheader("Adjustment Support")
-    st.caption("Derive market-supported adjustments using multiple statistical methods.")
+    st.caption("Upload Synapse MLS CSV exports to automatically derive market-supported adjustments.")
     st.divider()
 
-    as_sub1, as_sub2, as_sub3, as_sub4, as_sub5 = st.tabs([
-        "📊 Grouped Data",
-        "📈 OLS Regression",
-        "🔵 Theil-Sen",
-        "🔍 Sensitivity",
-        "🏗️ Depreciated Cost",
-    ])
-
-    # ── GROUPED DATA ──────────────────────────────────────────────────────────
-    with as_sub1:
-        st.markdown("#### Grouped Data — Average & Median")
-        st.caption(
-            "Enter sale prices for two groups (e.g. sales WITH a feature vs WITHOUT, "
-            "or superior vs inferior condition). The difference in group averages and "
-            "medians indicates a market-supported adjustment."
+    # ── CSV UPLOAD ────────────────────────────────────────────────────────────
+    up_col1, up_col2 = st.columns(2)
+    with up_col1:
+        comps_file = st.file_uploader(
+            "Comps CSV (Synapse MLS export)", type=["csv"], key="as_comps_csv"
         )
-        st.divider()
+    with up_col2:
+        nbhd_file = st.file_uploader(
+            "Neighborhood CSV (optional — pooled into analysis)", type=["csv"], key="as_nbhd_csv"
+        )
 
-        gd_col1, gd_col2 = st.columns(2)
-        with gd_col1:
-            st.markdown("**Group A** — Inferior / Without Feature")
-            gd_label_a = st.text_input(
-                "Group A label", value="Without Feature",
-                key="gd_label_a", placeholder="e.g. No Pool"
-            )
-            gd_default_a = pd.DataFrame({
-                "Sale ID": ["Sale 1", "Sale 2", "Sale 3", "Sale 4", "Sale 5"],
-                "Sale Price ($)": [300000, 310000, 295000, 305000, 315000],
-            })
-            gd_a = st.data_editor(
-                gd_default_a,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="gd_table_a",
-            )
-        with gd_col2:
-            st.markdown("**Group B** — Superior / With Feature")
-            gd_label_b = st.text_input(
-                "Group B label", value="With Feature",
-                key="gd_label_b", placeholder="e.g. Has Pool"
-            )
-            gd_default_b = pd.DataFrame({
-                "Sale ID": ["Sale 6", "Sale 7", "Sale 8", "Sale 9", "Sale 10"],
-                "Sale Price ($)": [330000, 345000, 320000, 340000, 335000],
-            })
-            gd_b = st.data_editor(
-                gd_default_b,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="gd_table_b",
-            )
+    # ── HELPER FUNCTIONS ──────────────────────────────────────────────────────
+    def _load_synapse_csv(f):
+        try:
+            raw = f.read()
+            f.seek(0)
+        except Exception:
+            return None
+        for enc in ("utf-8-sig", "utf-8", "latin-1"):
+            try:
+                return pd.read_csv(io.BytesIO(raw), encoding=enc, low_memory=False)
+            except Exception:
+                continue
+        return None
 
-        if st.button("Run Grouped Analysis", key="gd_run", use_container_width=True):
-            def _clean_prices(df):
-                try:
-                    col = [c for c in df.columns if "price" in c.lower() or "$" in c][0]
-                    vals = pd.to_numeric(df[col], errors="coerce").dropna().tolist()
-                    return [v for v in vals if v > 0]
-                except Exception:
-                    return []
+    _AS_PRICE_COL      = "Sold Price"
+    _AS_YEAR_BUILT     = "Year Built"
+    _AS_DEFAULT_FEATURES = [
+        "Apx Abv Gr LivSF",
+        "Approx Lot Square Foot",
+        "Apx Blw Gr Liv SF",
+        "Baths Total",
+        "Beds Total",
+        "Garage Spaces",
+        "Age",
+        "Number Of Fireplaces",
+        "Basement Est % Finished",
+    ]
 
-            prices_a = _clean_prices(gd_a)
-            prices_b = _clean_prices(gd_b)
+    def _as_prep_df(df_raw):
+        df = df_raw.copy()
+        if _AS_PRICE_COL in df.columns:
+            df[_AS_PRICE_COL] = (
+                df[_AS_PRICE_COL].astype(str)
+                .str.replace(r"[\$,]", "", regex=True)
+                .pipe(pd.to_numeric, errors="coerce")
+            )
+        if _AS_YEAR_BUILT in df.columns:
+            df["Age"] = date.today().year - pd.to_numeric(df[_AS_YEAR_BUILT], errors="coerce")
+        return df
 
-            if len(prices_a) < 2 or len(prices_b) < 2:
-                st.error("Each group needs at least 2 valid sale prices.")
+    def _as_binary_encode(df, col):
+        s = df[col].astype(str).str.strip().str.upper()
+        result = pd.Series(np.nan, index=df.index)
+        result.loc[s.isin(["YES", "Y", "1", "TRUE", "HAS CENTRAL", "CENTRAL AIR", "AC"])] = 1.0
+        result.loc[s.isin(["NO", "N", "0", "FALSE", "NONE", "NO POOL", ""])]             = 0.0
+        return result
+
+    def _as_ols1(x_arr, y_arr):
+        X = np.column_stack([np.ones(len(y_arr)), x_arr])
+        try:
+            beta = np.linalg.solve(X.T @ X, X.T @ y_arr)
+        except np.linalg.LinAlgError:
+            beta = np.linalg.lstsq(X, y_arr, rcond=None)[0]
+        yhat   = X @ beta
+        ss_res = np.sum((y_arr - yhat) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
+        r2     = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        n, k   = len(y_arr), 1
+        mse    = ss_res / (n - k - 1) if n > k + 1 else 0.0
+        se     = np.sqrt(np.diag(np.linalg.pinv(X.T @ X) * mse))
+        return beta[1], beta[0], r2, se[1]
+
+    def _as_theil(x_arr, y_arr):
+        if len(x_arr) < 3:
+            return np.nan
+        return _scipy_stats.theilslopes(y_arr, x_arr).slope
+
+    def _as_loo(x_arr, y_arr):
+        ols_v, ts_v = [], []
+        for i in range(len(x_arr)):
+            mask = np.ones(len(x_arr), dtype=bool)
+            mask[i] = False
+            xl, yl = x_arr[mask], y_arr[mask]
+            if len(xl) < 3:
+                continue
+            ols_v.append(_as_ols1(xl, yl)[0])
+            ts_v.append(_as_theil(xl, yl))
+        ols_v = [v for v in ols_v if not np.isnan(v)]
+        ts_v  = [v for v in ts_v  if not np.isnan(v)]
+        return (
+            min(ols_v) if ols_v else np.nan,
+            max(ols_v) if ols_v else np.nan,
+            min(ts_v)  if ts_v  else np.nan,
+            max(ts_v)  if ts_v  else np.nan,
+        )
+
+    def _as_stability(slope, lo, hi):
+        if np.isnan(slope) or slope == 0:
+            return "—"
+        ratio = abs(hi - lo) / abs(slope)
+        if ratio < 0.20:
+            return "✅ Stable"
+        if ratio < 0.40:
+            return "⚠️ Moderate"
+        return "🔴 Sensitive"
+
+    # ── MAIN ANALYSIS ─────────────────────────────────────────────────────────
+    if comps_file is not None:
+        _df_comps_raw = _load_synapse_csv(comps_file)
+        if _df_comps_raw is None:
+            st.error("Could not parse comps CSV.")
+        else:
+            _df_all = _as_prep_df(_df_comps_raw)
+
+            if nbhd_file is not None:
+                _df_nbhd_raw = _load_synapse_csv(nbhd_file)
+                if _df_nbhd_raw is not None:
+                    _df_all = pd.concat([_df_all, _as_prep_df(_df_nbhd_raw)], ignore_index=True)
+
+            if _AS_PRICE_COL not in _df_all.columns:
+                st.error(f"Column '{_AS_PRICE_COL}' not found. Ensure this is a Synapse MLS export.")
             else:
-                avg_a  = np.mean(prices_a)
-                avg_b  = np.mean(prices_b)
-                med_a  = np.median(prices_a)
-                med_b  = np.median(prices_b)
-                n_a    = len(prices_a)
-                n_b    = len(prices_b)
+                _df_v = _df_all[pd.to_numeric(_df_all[_AS_PRICE_COL], errors="coerce").notna()].copy()
+                _df_v[_AS_PRICE_COL] = _df_v[_AS_PRICE_COL].astype(float)
 
-                st.divider()
-                st.markdown("#### Results")
-                r1, r2, r3 = st.columns(3)
-                with r1:
-                    st.metric(f"Avg — {gd_label_a}", f"${avg_a:,.0f}", delta=None)
-                    st.metric(f"Avg — {gd_label_b}", f"${avg_b:,.0f}", delta=None)
-                with r2:
-                    st.metric(f"Median — {gd_label_a}", f"${med_a:,.0f}", delta=None)
-                    st.metric(f"Median — {gd_label_b}", f"${med_b:,.0f}", delta=None)
-                with r3:
-                    avg_diff = avg_b - avg_a
-                    med_diff = med_b - med_a
-                    st.metric("Average Difference", f"${avg_diff:,.0f}")
-                    st.metric("Median Difference", f"${med_diff:,.0f}")
+                for _bc in ("Pool", "Cooling"):
+                    if _bc in _df_v.columns:
+                        _df_v[_bc] = _as_binary_encode(_df_v, _bc)
 
-                st.divider()
-                # Welch t-test
-                t_stat, p_val = _scipy_stats.ttest_ind(prices_b, prices_a, equal_var=False)
-                sig = "statistically significant (p < 0.05)" if p_val < 0.05 else "not statistically significant (p ≥ 0.05)"
-                st.markdown("**Statistical Test (Welch's t-test)**")
-                tc1, tc2, tc3 = st.columns(3)
-                with tc1: st.metric("t-statistic", f"{t_stat:.3f}")
-                with tc2: st.metric("p-value", f"{p_val:.4f}")
-                with tc3: st.metric("Result", "Significant" if p_val < 0.05 else "Not Significant")
+                _num_cols = [
+                    c for c in _df_v.columns
+                    if c != _AS_PRICE_COL and c != _AS_YEAR_BUILT
+                    and pd.to_numeric(_df_v[c], errors="coerce").notna().sum() >= 4
+                ]
+                _def_sel = [c for c in _AS_DEFAULT_FEATURES if c in _num_cols]
 
+                _n_comps = len(_df_comps_raw)
+                _n_nbhd  = len(_df_all) - _n_comps if nbhd_file else 0
+                st.success(
+                    f"Loaded **{len(_df_v)}** valid sales"
+                    + (f" ({_n_comps} comps + {_n_nbhd} neighborhood)" if _n_nbhd else f" ({_n_comps} comps)")
+                    + "."
+                )
                 st.divider()
-                st.markdown("**Interpretation**")
-                st.info(
-                    f"Based on {n_a} sales in Group A ({gd_label_a}) and {n_b} sales in Group B ({gd_label_b}): "
-                    f"the average price difference is **${avg_diff:,.0f}** and the median difference is **${med_diff:,.0f}**. "
-                    f"The difference is {sig} (p = {p_val:.4f}). "
-                    f"The indicated adjustment range is **${min(avg_diff, med_diff):,.0f} to ${max(avg_diff, med_diff):,.0f}**."
+
+                _selected = st.multiselect(
+                    "Select features to analyze",
+                    options=_num_cols,
+                    default=_def_sel,
+                    key="as_feature_sel",
                 )
 
-    # ── OLS REGRESSION ────────────────────────────────────────────────────────
-    with as_sub2:
-        st.markdown("#### OLS Regression")
-        st.caption(
-            "Enter comparable sale prices and up to three numeric feature variables "
-            "(e.g. GLA, lot size, age). OLS derives the per-unit contributory value "
-            "of the primary feature while controlling for the others."
-        )
-        st.divider()
-
-        ols_col1, ols_col2 = st.columns([2, 1])
-        with ols_col2:
-            st.markdown("**Variable Labels**")
-            ols_dep_label = st.text_input("Dependent variable", value="Sale Price ($)", key="ols_dep_label")
-            ols_x1_label  = st.text_input("Variable 1 (primary)", value="GLA (SF)", key="ols_x1_label")
-            ols_use_x2    = st.checkbox("Include Variable 2", key="ols_use_x2")
-            ols_x2_label  = st.text_input("Variable 2", value="Lot Size (SF)", key="ols_x2_label", disabled=not ols_use_x2)
-            ols_use_x3    = st.checkbox("Include Variable 3", key="ols_use_x3")
-            ols_x3_label  = st.text_input("Variable 3", value="Age (years)", key="ols_x3_label", disabled=not ols_use_x3)
-
-        with ols_col1:
-            st.markdown("**Comparable Data**")
-            ols_cols = {"Sale ID": ["Sale 1","Sale 2","Sale 3","Sale 4","Sale 5","Sale 6"],
-                        "Sale Price ($)": [300000,315000,290000,325000,310000,305000],
-                        "GLA (SF)": [1500,1650,1400,1700,1600,1550]}
-            ols_default = pd.DataFrame(ols_cols)
-            ols_data = st.data_editor(
-                ols_default,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="ols_table",
-                column_config={
-                    "Sale Price ($)": st.column_config.NumberColumn("Sale Price ($)", format="$%d"),
-                    "GLA (SF)": st.column_config.NumberColumn("GLA (SF)", format="%d"),
-                },
-            )
-
-        if st.button("Run OLS Regression", key="ols_run", use_container_width=True):
-            def _parse_col(df, label):
-                matches = [c for c in df.columns if label.split(" ")[0].lower() in c.lower()]
-                if not matches:
-                    matches = [df.columns[i] for i in range(len(df.columns))]
-                return matches[0] if matches else None
-
-            try:
-                price_col = [c for c in ols_data.columns if "price" in c.lower() or "$" in c.lower()][0]
-                feat_cols = [c for c in ols_data.columns if c != "Sale ID" and c != price_col]
-
-                if not ols_use_x2 and len(feat_cols) > 1:
-                    feat_cols = feat_cols[:1]
-                elif ols_use_x2 and not ols_use_x3 and len(feat_cols) > 2:
-                    feat_cols = feat_cols[:2]
-
-                df_ols = ols_data[[price_col] + feat_cols].dropna()
-                df_ols = df_ols[pd.to_numeric(df_ols[price_col], errors="coerce").notna()]
-                for fc in feat_cols:
-                    df_ols = df_ols[pd.to_numeric(df_ols[fc], errors="coerce").notna()]
-
-                if len(df_ols) < len(feat_cols) + 2:
-                    st.error(f"Need at least {len(feat_cols) + 2} valid rows to run regression.")
+                if not _selected:
+                    st.info("Select at least one feature above to run the analysis.")
                 else:
-                    y = df_ols[price_col].astype(float).values
-                    X_raw = df_ols[feat_cols].astype(float).values
-                    X = np.column_stack([np.ones(len(y)), X_raw])
+                    if st.button("▶ Run All Methods", key="as_run_all", use_container_width=True, type="primary"):
+                        _rows = []
+                        for _feat in _selected:
+                            _pair = _df_v[[_feat, _AS_PRICE_COL]].copy()
+                            _pair[_feat] = pd.to_numeric(_pair[_feat], errors="coerce")
+                            _pair = _pair.dropna()
+                            _pair = _pair[_pair[_AS_PRICE_COL] > 0]
+                            _nf   = len(_pair)
+                            if _nf < 4:
+                                _rows.append({
+                                    "Feature": _feat, "n": _nf,
+                                    "OLS ($/unit)": "—", "Theil-Sen ($/unit)": "—",
+                                    "Grp Avg ($/unit)": "—", "Grp Med ($/unit)": "—",
+                                    "LOO Min": "—", "LOO Max": "—", "Stability": "—",
+                                })
+                                continue
+                            _xa = _pair[_feat].values.astype(float)
+                            _ya = _pair[_AS_PRICE_COL].values.astype(float)
+                            _ols_s, _, _r2, _ = _as_ols1(_xa, _ya)
+                            _ts_s             = _as_theil(_xa, _ya)
+                            _lo, _hi, _, _    = _as_loo(_xa, _ya)
+                            _stab             = _as_stability(_ols_s, _lo, _hi)
+                            _med_x = np.median(_xa)
+                            _glo   = _ya[_xa <= _med_x]
+                            _ghi   = _ya[_xa >  _med_x]
+                            if len(_glo) >= 2 and len(_ghi) >= 2:
+                                _xgap  = np.median(_xa[_xa > _med_x]) - np.median(_xa[_xa <= _med_x])
+                                _g_avg = (np.mean(_ghi)   - np.mean(_glo))   / _xgap if _xgap else np.nan
+                                _g_med = (np.median(_ghi) - np.median(_glo)) / _xgap if _xgap else np.nan
+                            else:
+                                _g_avg, _g_med = np.nan, np.nan
 
-                    # OLS: beta = (X'X)^-1 X'y
-                    XtX = X.T @ X
-                    Xty = X.T @ y
-                    try:
-                        beta = np.linalg.solve(XtX, Xty)
-                    except np.linalg.LinAlgError:
-                        beta = np.linalg.lstsq(X, y, rcond=None)[0]
+                            def _fmtv(v):
+                                return f"${v:,.2f}" if not np.isnan(v) else "—"
 
-                    y_hat   = X @ beta
-                    resid   = y - y_hat
-                    ss_res  = np.sum(resid**2)
-                    ss_tot  = np.sum((y - np.mean(y))**2)
-                    r2      = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-                    n       = len(y)
-                    k       = len(feat_cols)
-                    adj_r2  = 1 - (1 - r2) * (n - 1) / (n - k - 1) if n > k + 1 else 0
-                    mse     = ss_res / (n - k - 1) if n > k + 1 else 0
-                    se_beta = np.sqrt(np.diag(np.linalg.pinv(XtX) * mse))
+                            _rows.append({
+                                "Feature":            _feat,
+                                "n":                  _nf,
+                                "OLS ($/unit)":       _fmtv(_ols_s),
+                                "Theil-Sen ($/unit)": _fmtv(_ts_s),
+                                "Grp Avg ($/unit)":   _fmtv(_g_avg),
+                                "Grp Med ($/unit)":   _fmtv(_g_med),
+                                "LOO Min":            _fmtv(_lo),
+                                "LOO Max":            _fmtv(_hi),
+                                "Stability":          _stab,
+                            })
+                        st.session_state["as_results"] = _rows
 
-                    st.divider()
-                    st.markdown("#### Results")
+                    if st.session_state.get("as_results"):
+                        _res = st.session_state["as_results"]
+                        st.divider()
+                        st.markdown("#### Results — All Methods Side-by-Side")
+                        st.caption(
+                            "OLS and Theil-Sen are per-unit regression slopes. "
+                            "Grp Avg / Grp Med split sales at the feature median and normalize by the median group gap. "
+                            "LOO Min/Max are the OLS slope range from leave-one-out sensitivity analysis."
+                        )
+                        st.dataframe(pd.DataFrame(_res), use_container_width=True, hide_index=True)
 
-                    st.markdown("**Coefficients**")
-                    coef_rows = []
-                    labels_all = ["Intercept"] + feat_cols
-                    for i, lbl in enumerate(labels_all):
-                        t_val = beta[i] / se_beta[i] if se_beta[i] > 0 else 0
-                        p_v   = 2 * (1 - _scipy_stats.t.cdf(abs(t_val), df=max(n-k-1,1)))
-                        coef_rows.append({
-                            "Variable": lbl,
-                            "Coefficient": f"${beta[i]:,.2f}" if i > 0 else f"${beta[i]:,.0f}",
-                            "Std Error": f"${se_beta[i]:,.2f}",
-                            "t-stat": f"{t_val:.3f}",
-                            "p-value": f"{p_v:.4f}",
-                            "Significant": "✅" if p_v < 0.05 else "—",
-                        })
-                    st.dataframe(pd.DataFrame(coef_rows), use_container_width=True, hide_index=True)
+                        # Multiple OLS
+                        st.divider()
+                        st.markdown("#### Multiple OLS — All Selected Features Simultaneously")
+                        _mc = [
+                            c for c in _selected
+                            if pd.to_numeric(_df_v[c], errors="coerce").notna().sum() >= 4
+                        ]
+                        if len(_mc) >= 2:
+                            _dm = _df_v[[_AS_PRICE_COL] + _mc].copy()
+                            for _c in _mc:
+                                _dm[_c] = pd.to_numeric(_dm[_c], errors="coerce")
+                            _dm = _dm.dropna()
+                            _dm = _dm[_dm[_AS_PRICE_COL] > 0]
+                            if len(_dm) >= len(_mc) + 2:
+                                _ym = _dm[_AS_PRICE_COL].values.astype(float)
+                                _Xm = np.column_stack(
+                                    [np.ones(len(_ym))] + [_dm[c].values.astype(float) for c in _mc]
+                                )
+                                try:
+                                    _bm = np.linalg.solve(_Xm.T @ _Xm, _Xm.T @ _ym)
+                                except np.linalg.LinAlgError:
+                                    _bm = np.linalg.lstsq(_Xm, _ym, rcond=None)[0]
+                                _yh_m    = _Xm @ _bm
+                                _ssr_m   = np.sum((_ym - _yh_m) ** 2)
+                                _sst_m   = np.sum((_ym - np.mean(_ym)) ** 2)
+                                _r2m     = 1 - _ssr_m / _sst_m if _sst_m > 0 else 0.0
+                                _nm, _km = len(_ym), len(_mc)
+                                _adj_r2m = 1 - (1 - _r2m) * (_nm - 1) / (_nm - _km - 1) if _nm > _km + 1 else 0.0
+                                _msem    = _ssr_m / (_nm - _km - 1) if _nm > _km + 1 else 0.0
+                                _sem     = np.sqrt(np.diag(np.linalg.pinv(_Xm.T @ _Xm) * _msem))
+                                _coef_m  = []
+                                for _i, _lbl in enumerate(["Intercept"] + _mc):
+                                    _tv = _bm[_i] / _sem[_i] if _sem[_i] > 0 else 0.0
+                                    _pv = 2 * (1 - _scipy_stats.t.cdf(abs(_tv), df=max(_nm - _km - 1, 1)))
+                                    _coef_m.append({
+                                        "Variable":    _lbl,
+                                        "Coefficient": f"${_bm[_i]:,.2f}" if _i > 0 else f"${_bm[_i]:,.0f}",
+                                        "Std Error":   f"${_sem[_i]:,.2f}",
+                                        "t-stat":      f"{_tv:.3f}",
+                                        "p-value":     f"{_pv:.4f}",
+                                        "Sig":         "✅" if _pv < 0.05 else "—",
+                                    })
+                                st.dataframe(pd.DataFrame(_coef_m), use_container_width=True, hide_index=True)
+                                _mc1, _mc2, _mc3 = st.columns(3)
+                                with _mc1: st.metric("R²", f"{_r2m:.4f}")
+                                with _mc2: st.metric("Adj. R²", f"{_adj_r2m:.4f}")
+                                with _mc3: st.metric("n (sales)", str(_nm))
+                            else:
+                                st.info(
+                                    f"Not enough complete rows for multiple OLS "
+                                    f"({len(_dm)} available after dropping nulls, need ≥ {len(_mc)+2})."
+                                )
+                        else:
+                            st.info("Select at least 2 features for multiple OLS.")
 
-                    st.markdown("**Model Fit**")
-                    m1, m2, m3 = st.columns(3)
-                    with m1: st.metric("R²", f"{r2:.4f}")
-                    with m2: st.metric("Adjusted R²", f"{adj_r2:.4f}")
-                    with m3: st.metric("n (sales)", str(n))
-
-                    primary_coef = beta[1]
-                    primary_label = feat_cols[0] if feat_cols else "Feature"
-                    st.divider()
-                    st.markdown("**Interpretation**")
-                    st.info(
-                        f"The OLS-derived adjustment for **{primary_label}** is "
-                        f"**${primary_coef:,.2f} per unit** (controlling for {len(feat_cols)-1} other variable(s)). "
-                        f"The model explains {r2*100:.1f}% of price variation (R² = {r2:.4f}, Adj. R² = {adj_r2:.4f}) "
-                        f"across {n} comparable sales."
-                    )
-
-                    st.markdown("**Residuals**")
-                    res_df = pd.DataFrame({
-                        "Sale ID": ols_data["Sale ID"].values[:len(resid)] if "Sale ID" in ols_data.columns else [f"Sale {i+1}" for i in range(len(resid))],
-                        "Actual Price": [f"${v:,.0f}" for v in y],
-                        "Predicted":    [f"${v:,.0f}" for v in y_hat],
-                        "Residual":     [f"${v:,.0f}" for v in resid],
-                    })
-                    st.dataframe(res_df, use_container_width=True, hide_index=True)
-
-            except Exception as e:
-                st.error(f"Error running OLS: {e}")
-
-    # ── THEIL-SEN REGRESSION ──────────────────────────────────────────────────
-    with as_sub3:
-        st.markdown("#### Theil-Sen Regression")
-        st.caption(
-            "Theil-Sen is a robust regression method less sensitive to outliers than OLS. "
-            "It computes the median slope across all pairwise combinations of data points. "
-            "Use this when your comparable set is small or contains outlier sales."
-        )
-        st.divider()
-
-        ts_col1, ts_col2 = st.columns([2, 1])
-        with ts_col2:
-            st.markdown("**Variable Labels**")
-            ts_x_label = st.text_input("Feature (X axis)", value="GLA (SF)", key="ts_x_label")
-            ts_y_label = st.text_input("Sale Price (Y axis)", value="Sale Price ($)", key="ts_y_label")
-            st.divider()
-            st.markdown("**Subject**")
-            ts_subj_val = st.number_input(
-                "Subject feature value", value=1550, step=50, key="ts_subj_val",
-                help="Used to estimate the subject's price from the Theil-Sen line."
-            )
-
-        with ts_col1:
-            st.markdown("**Comparable Data**")
-            ts_default = pd.DataFrame({
-                "Sale ID": ["Sale 1","Sale 2","Sale 3","Sale 4","Sale 5","Sale 6"],
-                "Sale Price ($)": [300000,315000,290000,325000,310000,305000],
-                "GLA (SF)": [1500,1650,1400,1700,1600,1550],
-            })
-            ts_data = st.data_editor(
-                ts_default,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="ts_table",
-                column_config={
-                    "Sale Price ($)": st.column_config.NumberColumn("Sale Price ($)", format="$%d"),
-                    "GLA (SF)": st.column_config.NumberColumn("GLA (SF)", format="%d"),
-                },
-            )
-
-        if st.button("Run Theil-Sen Regression", key="ts_run", use_container_width=True):
-            try:
-                price_col_ts = [c for c in ts_data.columns if "price" in c.lower() or "$" in c.lower()][0]
-                feat_col_ts  = [c for c in ts_data.columns if c != "Sale ID" and c != price_col_ts][0]
-
-                df_ts = ts_data[[feat_col_ts, price_col_ts]].apply(pd.to_numeric, errors="coerce").dropna()
-                df_ts = df_ts[(df_ts[feat_col_ts] > 0) & (df_ts[price_col_ts] > 0)]
-
-                if len(df_ts) < 3:
-                    st.error("Need at least 3 valid data points for Theil-Sen regression.")
-                else:
-                    x_ts = df_ts[feat_col_ts].values
-                    y_ts = df_ts[price_col_ts].values
-
-                    result = _scipy_stats.theilslopes(y_ts, x_ts, alpha=0.10)
-                    slope       = result.slope
-                    intercept   = result.intercept
-                    slope_lo    = result.low_slope
-                    slope_hi    = result.high_slope
-
-                    y_hat_ts    = intercept + slope * x_ts
-                    ss_res_ts   = np.sum((y_ts - y_hat_ts)**2)
-                    ss_tot_ts   = np.sum((y_ts - np.mean(y_ts))**2)
-                    r2_ts       = 1 - ss_res_ts / ss_tot_ts if ss_tot_ts > 0 else 0
-                    n_ts        = len(x_ts)
-
-                    pred_subj   = intercept + slope * ts_subj_val
-
-                    st.divider()
-                    st.markdown("#### Results")
-                    m1, m2, m3 = st.columns(3)
-                    with m1: st.metric("Slope (adj/unit)", f"${slope:,.2f}")
-                    with m2: st.metric("90% CI Low", f"${slope_lo:,.2f}")
-                    with m3: st.metric("90% CI High", f"${slope_hi:,.2f}")
-
-                    m4, m5, m6 = st.columns(3)
-                    with m4: st.metric("Intercept", f"${intercept:,.0f}")
-                    with m5: st.metric("R² (approx.)", f"{r2_ts:.4f}")
-                    with m6: st.metric("n (sales)", str(n_ts))
-
-                    st.metric(f"Predicted price at subject ({ts_x_label} = {ts_subj_val:,})", f"${pred_subj:,.0f}")
-
-                    st.divider()
-                    st.markdown("**Interpretation**")
-                    st.info(
-                        f"Theil-Sen indicates a per-unit adjustment of **${slope:,.2f} per {ts_x_label}** "
-                        f"(90% CI: ${slope_lo:,.2f} to ${slope_hi:,.2f}). "
-                        f"The model approximates {r2_ts*100:.1f}% of price variation across {n_ts} comparable sales. "
-                        f"At the subject's {ts_x_label} of {ts_subj_val:,}, the estimated price is **${pred_subj:,.0f}**."
-                    )
-
-                    st.markdown("**Residuals**")
-                    ts_res_df = pd.DataFrame({
-                        "Sale ID": ts_data["Sale ID"].values[:len(x_ts)] if "Sale ID" in ts_data.columns else [f"Sale {i+1}" for i in range(n_ts)],
-                        ts_x_label: [f"{v:,.0f}" for v in x_ts],
-                        "Actual Price": [f"${v:,.0f}" for v in y_ts],
-                        "Predicted":    [f"${v:,.0f}" for v in y_hat_ts],
-                        "Residual":     [f"${v:,.0f}" for v in y_ts - y_hat_ts],
-                    })
-                    st.dataframe(ts_res_df, use_container_width=True, hide_index=True)
-
-            except Exception as e:
-                st.error(f"Error running Theil-Sen: {e}")
-
-    # ── SENSITIVITY ANALYSIS ──────────────────────────────────────────────────
-    with as_sub4:
-        st.markdown("#### Sensitivity Analysis — Leave-One-Out")
-        st.caption(
-            "Tests how stable the derived adjustment is by removing each comparable "
-            "one at a time and re-running both OLS and Theil-Sen. A narrow range of "
-            "results indicates the adjustment is well-supported. A wide range signals "
-            "that one or more sales are driving the result."
-        )
-        st.divider()
-
-        sa_col1, sa_col2 = st.columns([2, 1])
-        with sa_col2:
-            st.markdown("**Variable Labels**")
-            sa_x_label = st.text_input("Feature (X axis)", value="GLA (SF)", key="sa_x_label")
-            sa_y_label = st.text_input("Sale Price (Y axis)", value="Sale Price ($)", key="sa_y_label")
-
-        with sa_col1:
-            st.markdown("**Comparable Data**")
-            sa_default = pd.DataFrame({
-                "Sale ID": ["Sale 1","Sale 2","Sale 3","Sale 4","Sale 5","Sale 6","Sale 7"],
-                "Sale Price ($)": [300000,315000,290000,325000,310000,305000,320000],
-                "GLA (SF)": [1500,1650,1400,1700,1600,1550,1625],
-            })
-            sa_data = st.data_editor(
-                sa_default,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="sa_table",
-                column_config={
-                    "Sale Price ($)": st.column_config.NumberColumn("Sale Price ($)", format="$%d"),
-                    "GLA (SF)": st.column_config.NumberColumn("GLA (SF)", format="%d"),
-                },
-            )
-
-        if st.button("Run Sensitivity Analysis", key="sa_run", use_container_width=True):
-            try:
-                price_col_sa = [c for c in sa_data.columns if "price" in c.lower() or "$" in c.lower()][0]
-                feat_col_sa  = [c for c in sa_data.columns if c != "Sale ID" and c != price_col_sa][0]
-                id_col_sa    = "Sale ID" if "Sale ID" in sa_data.columns else None
-
-                df_sa = sa_data.copy()
-                if id_col_sa:
-                    df_sa = df_sa[[id_col_sa, feat_col_sa, price_col_sa]]
-                else:
-                    df_sa = df_sa[[feat_col_sa, price_col_sa]]
-                df_sa[feat_col_sa]  = pd.to_numeric(df_sa[feat_col_sa],  errors="coerce")
-                df_sa[price_col_sa] = pd.to_numeric(df_sa[price_col_sa], errors="coerce")
-                df_sa = df_sa.dropna(subset=[feat_col_sa, price_col_sa])
-                df_sa = df_sa[(df_sa[feat_col_sa] > 0) & (df_sa[price_col_sa] > 0)].reset_index(drop=True)
-
-                if len(df_sa) < 4:
-                    st.error("Need at least 4 valid data points for leave-one-out sensitivity analysis.")
-                else:
-                    x_all = df_sa[feat_col_sa].values.astype(float)
-                    y_all = df_sa[price_col_sa].values.astype(float)
-                    sale_ids = df_sa[id_col_sa].values if id_col_sa else [f"Sale {i+1}" for i in range(len(df_sa))]
-
-                    # Full-dataset estimates
-                    X_full = np.column_stack([np.ones(len(y_all)), x_all])
-                    ols_full = np.linalg.lstsq(X_full, y_all, rcond=None)[0][1]
-                    ts_full  = _scipy_stats.theilslopes(y_all, x_all).slope
-
-                    rows = []
-                    for i in range(len(df_sa)):
-                        mask    = np.ones(len(df_sa), dtype=bool)
-                        mask[i] = False
-                        x_loo   = x_all[mask]
-                        y_loo   = y_all[mask]
-
-                        X_loo = np.column_stack([np.ones(len(y_loo)), x_loo])
-                        ols_loo = np.linalg.lstsq(X_loo, y_loo, rcond=None)[0][1]
-                        ts_loo  = _scipy_stats.theilslopes(y_loo, x_loo).slope
-
-                        rows.append({
-                            "Excluded Sale":   sale_ids[i],
-                            f"{sa_x_label} Excluded": f"{x_all[i]:,.0f}",
-                            "OLS Adj/Unit":    f"${ols_loo:,.2f}",
-                            "Theil-Sen Adj/Unit": f"${ts_loo:,.2f}",
-                            "OLS Δ vs Full":   f"${ols_loo - ols_full:+,.2f}",
-                            "TS Δ vs Full":    f"${ts_loo - ts_full:+,.2f}",
-                        })
-
-                    st.divider()
-                    st.markdown("#### Results")
-                    sa_df = pd.DataFrame(rows)
-                    st.dataframe(sa_df, use_container_width=True, hide_index=True)
-
-                    ols_loos = [float(r["OLS Adj/Unit"].replace("$","").replace(",","")) for r in rows]
-                    ts_loos  = [float(r["Theil-Sen Adj/Unit"].replace("$","").replace(",","")) for r in rows]
-
-                    st.markdown("**Summary**")
-                    sc1, sc2 = st.columns(2)
-                    with sc1:
-                        st.markdown("**OLS**")
-                        sm1, sm2, sm3 = st.columns(3)
-                        with sm1: st.metric("Full Dataset", f"${ols_full:,.2f}")
-                        with sm2: st.metric("LOO Min", f"${min(ols_loos):,.2f}")
-                        with sm3: st.metric("LOO Max", f"${max(ols_loos):,.2f}")
-                    with sc2:
-                        st.markdown("**Theil-Sen**")
-                        sm4, sm5, sm6 = st.columns(3)
-                        with sm4: st.metric("Full Dataset", f"${ts_full:,.2f}")
-                        with sm5: st.metric("LOO Min", f"${min(ts_loos):,.2f}")
-                        with sm6: st.metric("LOO Max", f"${max(ts_loos):,.2f}")
-
-                    ols_range = max(ols_loos) - min(ols_loos)
-                    ts_range  = max(ts_loos)  - min(ts_loos)
-                    stability = "well-supported and stable" if max(ols_range, ts_range) < abs(ols_full) * 0.20 else "moderately stable" if max(ols_range, ts_range) < abs(ols_full) * 0.40 else "sensitive to outliers — review individual sales"
-
-                    st.divider()
-                    st.markdown("**Interpretation**")
-                    st.info(
-                        f"Full-dataset OLS: **${ols_full:,.2f}/unit**; Theil-Sen: **${ts_full:,.2f}/unit**. "
-                        f"Leave-one-out OLS range: ${min(ols_loos):,.2f} to ${max(ols_loos):,.2f} (spread: ${ols_range:,.2f}). "
-                        f"Leave-one-out Theil-Sen range: ${min(ts_loos):,.2f} to ${max(ts_loos):,.2f} (spread: ${ts_range:,.2f}). "
-                        f"The adjustment is **{stability}**."
-                    )
-
-            except Exception as e:
-                st.error(f"Error running sensitivity analysis: {e}")
+    else:
+        st.info("Upload a Synapse MLS comps CSV above to begin.")
 
     # ── DEPRECIATED COST ──────────────────────────────────────────────────────
-    with as_sub5:
-        st.markdown("#### Depreciated Cost")
-        st.caption(
-            "Estimate the contributory value of a feature using the cost approach. "
-            "Enter the cost new per unit, apply physical depreciation, functional "
-            "obsolescence, and external obsolescence to arrive at a depreciated "
-            "cost indication for the adjustment."
-        )
-        st.divider()
-
+    st.divider()
+    with st.expander("🏗️ Depreciated Cost — Manual Entry", expanded=False):
         dc_col1, dc_col2 = st.columns(2)
         with dc_col1:
             st.markdown("**Feature Description**")
@@ -2845,7 +2644,6 @@ with tab8:
             dc_cost_new = st.number_input(
                 "Cost new ($)", value=45000, step=1000, min_value=0,
                 key="dc_cost_new", format="%d",
-                help="Current replacement cost for the feature."
             )
 
         with dc_col2:
@@ -2853,78 +2651,69 @@ with tab8:
             dc_phys_pct = st.number_input(
                 "Physical depreciation (%)", value=20.0, min_value=0.0, max_value=100.0,
                 step=1.0, format="%.1f", key="dc_phys_pct",
-                help="Wear and tear relative to cost new."
             )
             dc_func_pct = st.number_input(
                 "Functional obsolescence (%)", value=0.0, min_value=0.0, max_value=100.0,
                 step=1.0, format="%.1f", key="dc_func_pct",
-                help="Loss in value from functional deficiencies (e.g. dated design)."
             )
-            dc_ext_pct  = st.number_input(
+            dc_ext_pct = st.number_input(
                 "External obsolescence (%)", value=0.0, min_value=0.0, max_value=100.0,
                 step=1.0, format="%.1f", key="dc_ext_pct",
-                help="Loss in value from external factors (e.g. market resistance, location)."
             )
 
         st.divider()
-        st.markdown("**Multiple units / quantity adjustment**")
         dc_qty_col1, dc_qty_col2 = st.columns(2)
         with dc_qty_col1:
             dc_quantity = st.number_input(
-                "Quantity (units / SF / etc.)", value=1, min_value=1, step=1,
-                key="dc_quantity",
-                help="e.g. 2 garage stalls, 500 SF of deck"
+                "Quantity", value=1, min_value=1, step=1, key="dc_quantity",
             )
         with dc_qty_col2:
             dc_mkt_factor = st.number_input(
                 "Market acceptance factor (%)", value=100.0, min_value=0.0, max_value=200.0,
                 step=5.0, format="%.0f", key="dc_mkt_factor",
-                help="Adjust upward/downward based on market absorption of the feature's cost. "
-                     "100% = full cost; 50% = market absorbs half the cost."
             )
 
         if st.button("Calculate Depreciated Cost", key="dc_run", use_container_width=True):
-            cost_new_total  = dc_cost_new * dc_quantity
-            phys_dep        = cost_new_total * (dc_phys_pct / 100.0)
-            func_obs        = cost_new_total * (dc_func_pct / 100.0)
-            ext_obs         = cost_new_total * (dc_ext_pct  / 100.0)
-            total_dep       = phys_dep + func_obs + ext_obs
-            depreciated     = cost_new_total - total_dep
-            mkt_adjusted    = depreciated * (dc_mkt_factor / 100.0)
-            per_unit_result = mkt_adjusted / dc_quantity if dc_quantity > 0 else 0
+            cost_new_total = dc_cost_new * dc_quantity
+            phys_dep       = cost_new_total * (dc_phys_pct / 100.0)
+            func_obs       = cost_new_total * (dc_func_pct / 100.0)
+            ext_obs        = cost_new_total * (dc_ext_pct  / 100.0)
+            total_dep      = phys_dep + func_obs + ext_obs
+            depreciated    = cost_new_total - total_dep
+            mkt_adjusted   = depreciated * (dc_mkt_factor / 100.0)
+            per_unit_res   = mkt_adjusted / dc_quantity if dc_quantity > 0 else 0
 
             st.divider()
             st.markdown("#### Results")
             rc1, rc2, rc3 = st.columns(3)
             with rc1:
-                st.metric("Cost New (total)",        f"${cost_new_total:,.0f}")
-                st.metric("Physical Depreciation",   f"−${phys_dep:,.0f}")
+                st.metric("Cost New (total)",      f"${cost_new_total:,.0f}")
+                st.metric("Physical Depreciation", f"−${phys_dep:,.0f}")
             with rc2:
                 st.metric("Functional Obsolescence", f"−${func_obs:,.0f}")
                 st.metric("External Obsolescence",   f"−${ext_obs:,.0f}")
             with rc3:
-                st.metric("Depreciated Cost",        f"${depreciated:,.0f}")
-                st.metric("Mkt-Adjusted Value",      f"${mkt_adjusted:,.0f}")
+                st.metric("Depreciated Cost",    f"${depreciated:,.0f}")
+                st.metric("Mkt-Adjusted Value",  f"${mkt_adjusted:,.0f}")
 
             st.divider()
             total_dep_pct = (total_dep / cost_new_total * 100) if cost_new_total > 0 else 0
-            st.markdown("**Indicated Adjustment**")
             st.success(
                 f"**{dc_feature}** — {dc_quantity} × {dc_unit}: "
                 f"Cost new ${cost_new_total:,.0f} → "
                 f"total depreciation {total_dep_pct:.1f}% (${total_dep:,.0f}) → "
                 f"depreciated cost ${depreciated:,.0f} → "
                 f"market-adjusted @ {dc_mkt_factor:.0f}%: **${mkt_adjusted:,.0f}** "
-                f"(${per_unit_result:,.0f} {dc_unit})."
+                f"(${per_unit_res:,.0f} {dc_unit})."
             )
-
-            st.markdown("**Depreciation Breakdown**")
             dep_df = pd.DataFrame([
-                {"Component": "Cost New",                   "Amount": f"${cost_new_total:,.0f}", "% of Cost New": "100.0%"},
-                {"Component": "Physical Depreciation",      "Amount": f"−${phys_dep:,.0f}",      "% of Cost New": f"{dc_phys_pct:.1f}%"},
-                {"Component": "Functional Obsolescence",    "Amount": f"−${func_obs:,.0f}",      "% of Cost New": f"{dc_func_pct:.1f}%"},
-                {"Component": "External Obsolescence",      "Amount": f"−${ext_obs:,.0f}",       "% of Cost New": f"{dc_ext_pct:.1f}%"},
-                {"Component": "Depreciated Cost",           "Amount": f"${depreciated:,.0f}",    "% of Cost New": f"{100-total_dep_pct:.1f}%"},
-                {"Component": f"Market Acceptance ({dc_mkt_factor:.0f}%)", "Amount": f"${mkt_adjusted:,.0f}", "% of Cost New": f"{mkt_adjusted/cost_new_total*100 if cost_new_total else 0:.1f}%"},
+                {"Component": "Cost New",                f"Amount": f"${cost_new_total:,.0f}", "% of Cost New": "100.0%"},
+                {"Component": "Physical Depreciation",   "Amount": f"−${phys_dep:,.0f}",      "% of Cost New": f"{dc_phys_pct:.1f}%"},
+                {"Component": "Functional Obsolescence", "Amount": f"−${func_obs:,.0f}",      "% of Cost New": f"{dc_func_pct:.1f}%"},
+                {"Component": "External Obsolescence",   "Amount": f"−${ext_obs:,.0f}",       "% of Cost New": f"{dc_ext_pct:.1f}%"},
+                {"Component": "Depreciated Cost",        "Amount": f"${depreciated:,.0f}",    "% of Cost New": f"{100-total_dep_pct:.1f}%"},
+                {"Component": f"Market Acceptance ({dc_mkt_factor:.0f}%)", "Amount": f"${mkt_adjusted:,.0f}",
+                 "% of Cost New": f"{mkt_adjusted/cost_new_total*100 if cost_new_total else 0:.1f}%"},
             ])
             st.dataframe(dep_df, use_container_width=True, hide_index=True)
+
