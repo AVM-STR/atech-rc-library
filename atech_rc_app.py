@@ -448,14 +448,6 @@ DEFAULT_NEIGHBORHOODS = [
 # ── Storage ───────────────────────────────────────────────────────────────────
 def load_data(key, filepath, default):
     try:
-        raw = st.session_state.get(key)
-        if raw:
-            parsed = json.loads(raw)
-            if parsed:
-                return parsed
-    except Exception:
-        pass
-    try:
         path = os.path.join(os.path.dirname(__file__), filepath)
         if os.path.exists(path):
             with open(path) as f:
@@ -465,13 +457,9 @@ def load_data(key, filepath, default):
     return [item.copy() for item in default]
 
 def save_data(key, filepath, data):
-    st.session_state[key] = json.dumps(data)
-    try:
-        path = os.path.join(os.path.dirname(__file__), filepath)
-        with open(path, "w") as f:
-            json.dump(data, f)
-    except Exception:
-        pass
+    path = os.path.join(os.path.dirname(__file__), filepath)
+    with open(path, "w") as f:
+        json.dump(data, f)
 
 def load_revisions():
     return load_data("_rc_revisions", "rc_revisions.json", DEFAULT_REVISIONS)
@@ -536,10 +524,14 @@ def check_password():
     st.divider()
     pwd = st.text_input("Enter password to continue", type="password", key="pwd_input")
     if st.button("Login", use_container_width=True):
+        correct = None
         try:
             correct = st.secrets["APP_PASSWORD"]
         except Exception:
-            correct = os.environ.get("APP_PASSWORD", "atech2026")
+            correct = os.environ.get("APP_PASSWORD")
+        if not correct:
+            st.error("APP_PASSWORD is not configured. Contact your administrator.")
+            return False
         if pwd == correct:
             st.session_state.authenticated = True
             st.rerun()
@@ -554,6 +546,142 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-feature-settings: 'calt' 1, 'kern' 1, 'liga' 1, 'ss03' 1; }
+
+/* ── Base ── */
+.stApp, .stApp > div, section.main, section.main > div,
+[data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    background-color: #07080a !important; }
+
+/* ── Typography ── */
+.stApp p, .stApp li, .stApp span, .stApp div, .stApp label,
+.stMarkdown p, .stMarkdown li {
+    color: #f9f9f9; letter-spacing: 0.2px; font-weight: 500; }
+h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    color: #ffffff !important; letter-spacing: 0.2px; }
+[data-testid="stCaptionContainer"], .stCaption, small {
+    color: #9c9c9d !important; font-size: 13px; font-weight: 500; letter-spacing: 0.2px; }
+
+/* ── Buttons ── */
+.stButton > button, .stFormSubmitButton > button {
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 6px !important;
+    color: #f9f9f9 !important;
+    font-weight: 600 !important; font-size: 14px !important; letter-spacing: 0.3px !important;
+    box-shadow: rgba(255,255,255,0.05) 0px 1px 0px 0px inset,
+                rgba(0,0,0,0.2) 0px -1px 0px 0px inset,
+                rgba(0,0,0,0.03) 0px 7px 3px !important;
+    transition: opacity 0.2s ease !important; }
+.stButton > button:hover, .stFormSubmitButton > button:hover {
+    opacity: 0.6 !important; background: transparent !important;
+    border-color: rgba(255,255,255,0.1) !important; color: #f9f9f9 !important; }
+.stButton > button:focus { outline: none !important;
+    box-shadow: rgba(255,255,255,0.05) 0px 1px 0px 0px inset,
+                rgba(0,0,0,0.2) 0px -1px 0px 0px inset,
+                rgba(85,179,255,0.3) 0px 0px 0px 2px !important; }
+.stDownloadButton > button {
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 6px !important; color: #f9f9f9 !important;
+    font-weight: 600 !important; letter-spacing: 0.3px !important;
+    transition: opacity 0.2s ease !important; }
+.stDownloadButton > button:hover { opacity: 0.6 !important; }
+
+/* ── Inputs ── */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stNumberInput > div > div > input {
+    background: #0d0e10 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important; color: #f9f9f9 !important;
+    font-size: 14px !important; letter-spacing: 0.2px !important; }
+.stTextInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder { color: #6a6b6c !important; }
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: rgba(85,179,255,0.5) !important;
+    box-shadow: hsla(202,100%,67%,0.12) 0px 0px 0px 3px !important; }
+.stTextInput label, .stTextArea label, .stNumberInput label,
+.stSelectbox label, .stMultiSelect label {
+    color: #9c9c9d !important; font-size: 13px !important;
+    font-weight: 500 !important; letter-spacing: 0.2px !important; }
+
+/* ── Selectbox ── */
+.stSelectbox > div > div, .stMultiSelect > div > div {
+    background: #0d0e10 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important; color: #f9f9f9 !important; }
+
+/* ── Tabs ── */
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important; gap: 2px !important; }
+.stTabs [data-baseweb="tab"] {
+    background: transparent !important; color: #9c9c9d !important;
+    font-weight: 500 !important; font-size: 13px !important; letter-spacing: 0.2px !important;
+    border: none !important; border-radius: 6px 6px 0 0 !important;
+    padding: 8px 14px !important; transition: opacity 0.2s ease !important; }
+.stTabs [data-baseweb="tab"]:hover {
+    color: #f9f9f9 !important; background: rgba(255,255,255,0.04) !important; }
+.stTabs [aria-selected="true"] {
+    color: #ffffff !important; background: transparent !important;
+    border-bottom: 2px solid #FF6363 !important; }
+.stTabs [data-baseweb="tab-panel"] {
+    background: transparent !important; padding-top: 16px !important; }
+
+/* ── Expanders ── */
+.streamlit-expanderHeader {
+    background: #101111 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 12px !important; color: #f9f9f9 !important;
+    font-weight: 500 !important; letter-spacing: 0.2px !important;
+    box-shadow: rgb(27,28,30) 0px 0px 0px 1px, rgb(7,8,10) 0px 0px 0px 1px inset !important; }
+.streamlit-expanderHeader:hover {
+    background: #141516 !important; border-color: rgba(255,255,255,0.1) !important; }
+.streamlit-expanderContent {
+    background: #101111 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-top: none !important; border-radius: 0 0 12px 12px !important; }
+
+/* ── Dividers ── */
+hr, [data-testid="stDivider"] > div {
+    border-color: rgba(255,255,255,0.06) !important;
+    border-top-color: rgba(255,255,255,0.06) !important; }
+
+/* ── Alerts ── */
+[data-testid="stNotificationContentSuccess"], .stAlert [data-baseweb="notification"] {
+    border-radius: 8px !important; }
+div[data-testid="stAlert"] > div[role="alert"] {
+    border-radius: 8px !important; background: #101111 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important; }
+.element-container div[data-testid="stMarkdownContainer"] + div { border-radius: 8px !important; }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: #101111 !important;
+    border-right: 1px solid rgba(255,255,255,0.06) !important; }
+
+/* ── Metric ── */
+[data-testid="stMetric"] {
+    background: #101111 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 12px !important; padding: 16px !important; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #07080a; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+</style>
+""", unsafe_allow_html=True)
+
 if not check_password():
     st.stop()
 
@@ -565,12 +693,12 @@ if os.path.exists(LOGO_PATH):
     st.markdown(f"""
     <div style="display:flex;flex-direction:column;align-items:center;padding:16px 0 8px 0;">
         <img src="data:image/png;base64,{logo_b64}" style="height:64px;width:auto;margin-bottom:10px;">
-        <div style="font-size:1.8rem;font-weight:700;line-height:1.2;text-align:center;">A-Tech Appraisal Co.</div>
-        <div style="color:gray;font-size:0.85rem;text-align:center;">Revision & Comment Library — Field Reference</div>
+        <div style="font-size:1.8rem;font-weight:700;line-height:1.2;text-align:center;color:#ffffff;letter-spacing:0.2px;">A-Tech Appraisal Co.</div>
+        <div style="color:#9c9c9d;font-size:0.85rem;text-align:center;letter-spacing:0.3px;font-weight:500;">Revision & Comment Library — Field Reference</div>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.markdown("<h2 style='text-align:center'>A-Tech Appraisal Co.</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;color:#ffffff;letter-spacing:0.2px;'>A-Tech Appraisal Co.</h2>", unsafe_allow_html=True)
 st.divider()
 
 # ── Export All Data ───────────────────────────────────────────────────────────
@@ -632,11 +760,14 @@ if st.session_state.get("show_admin_login") and not st.session_state["site_admin
             adm_pwd = st.text_input("Admin password:", type="password", key="global_admin_pwd", label_visibility="collapsed", placeholder="Enter admin password...")
         with adm_col2:
             if st.button("Unlock", key="global_admin_unlock", use_container_width=True):
+                correct = None
                 try:
                     correct = st.secrets["APP_PASSWORD"]
                 except Exception:
-                    correct = os.environ.get("APP_PASSWORD", "atech2026")
-                if adm_pwd == correct:
+                    correct = os.environ.get("APP_PASSWORD")
+                if not correct:
+                    st.error("APP_PASSWORD is not configured. Contact your administrator.")
+                elif adm_pwd == correct:
                     st.session_state["site_admin"] = True
                     st.session_state["show_admin_login"] = False
                     st.rerun()
