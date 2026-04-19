@@ -546,157 +546,6 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    font-feature-settings: 'calt' 1, 'kern' 1, 'liga' 1, 'ss03' 1; }
-
-/* ── Base ── */
-[data-testid="stAppViewContainer"],
-[data-testid="stApp"],
-[data-testid="stHeader"],
-[data-testid="stMain"],
-[data-testid="stMainBlockContainer"] {
-    background-color: #07080a !important; }
-
-/* ── Typography ── */
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stMarkdownContainer"] li,
-[data-testid="stMarkdownContainer"] span {
-    color: #f9f9f9; letter-spacing: 0.2px; font-weight: 500; }
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3 {
-    color: #ffffff !important; letter-spacing: 0.2px; }
-[data-testid="stCaptionContainer"] p {
-    color: #9c9c9d !important; font-size: 13px !important;
-    font-weight: 500 !important; letter-spacing: 0.2px !important; }
-
-/* ── Buttons ── */
-[data-testid="stButton"] > button,
-[data-testid="stFormSubmitButton"] > button,
-[data-testid="stBaseButton-secondary"],
-[data-testid="stBaseButton-primary"] {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 6px !important;
-    color: #f9f9f9 !important;
-    font-weight: 600 !important; font-size: 14px !important; letter-spacing: 0.3px !important;
-    box-shadow: rgba(255,255,255,0.05) 0px 1px 0px 0px inset,
-                rgba(0,0,0,0.2) 0px -1px 0px 0px inset,
-                rgba(0,0,0,0.03) 0px 7px 3px !important;
-    transition: opacity 0.2s ease !important; }
-[data-testid="stButton"] > button:hover,
-[data-testid="stFormSubmitButton"] > button:hover,
-[data-testid="stBaseButton-secondary"]:hover,
-[data-testid="stBaseButton-primary"]:hover {
-    opacity: 0.6 !important; background: transparent !important;
-    color: #f9f9f9 !important; }
-[data-testid="stDownloadButton"] > button {
-    background: transparent !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 6px !important; color: #f9f9f9 !important;
-    font-weight: 600 !important; letter-spacing: 0.3px !important;
-    transition: opacity 0.2s ease !important; }
-[data-testid="stDownloadButton"] > button:hover { opacity: 0.6 !important; }
-
-/* ── Inputs ── */
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea,
-[data-testid="stNumberInput"] input {
-    background: #0d0e10 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important; color: #f9f9f9 !important;
-    font-size: 14px !important; letter-spacing: 0.2px !important; }
-[data-testid="stTextInput"] input::placeholder,
-[data-testid="stTextArea"] textarea::placeholder { color: #6a6b6c !important; }
-[data-testid="stTextInput"] input:focus,
-[data-testid="stTextArea"] textarea:focus {
-    border-color: rgba(85,179,255,0.5) !important;
-    box-shadow: hsla(202,100%,67%,0.12) 0px 0px 0px 3px !important; }
-[data-testid="stTextInput"] label,
-[data-testid="stTextArea"] label,
-[data-testid="stNumberInput"] label,
-[data-testid="stSelectbox"] label,
-[data-testid="stMultiSelect"] label {
-    color: #9c9c9d !important; font-size: 13px !important;
-    font-weight: 500 !important; letter-spacing: 0.2px !important; }
-
-/* ── Selectbox ── */
-[data-testid="stSelectbox"] > div > div,
-[data-testid="stMultiSelect"] > div > div {
-    background: #0d0e10 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important; color: #f9f9f9 !important; }
-
-/* ── Tabs ── */
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    background: transparent !important;
-    border-bottom: 1px solid rgba(255,255,255,0.08) !important; gap: 2px !important; }
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    background: transparent !important; color: #9c9c9d !important;
-    font-weight: 500 !important; font-size: 13px !important; letter-spacing: 0.2px !important;
-    border: none !important; border-radius: 6px 6px 0 0 !important;
-    padding: 8px 14px !important; transition: opacity 0.2s ease !important; }
-[data-testid="stTabs"] [data-baseweb="tab"]:hover {
-    color: #f9f9f9 !important; background: rgba(255,255,255,0.04) !important; }
-[data-testid="stTabs"] [aria-selected="true"] {
-    color: #ffffff !important; background: transparent !important;
-    border-bottom: 2px solid #FF6363 !important; }
-[data-testid="stTabs"] [data-baseweb="tab-panel"] {
-    background: transparent !important; padding-top: 16px !important; }
-
-/* ── Expanders ── */
-[data-testid="stExpander"] details {
-    background: #101111 !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-    border-radius: 12px !important;
-    box-shadow: rgb(27,28,30) 0px 0px 0px 1px, rgb(7,8,10) 0px 0px 0px 1px inset !important; }
-[data-testid="stExpander"] details summary {
-    color: #f9f9f9 !important; font-weight: 500 !important; letter-spacing: 0.2px !important;
-    border-radius: 12px !important; }
-[data-testid="stExpander"] details:not([open]) summary { border-radius: 12px !important; }
-[data-testid="stExpander"] details[open] summary { border-radius: 12px 12px 0 0 !important; }
-[data-testid="stExpander"] details summary:hover { background: rgba(255,255,255,0.03) !important; }
-[data-testid="stExpanderDetails"] {
-    background: #101111 !important; border-radius: 0 0 12px 12px !important; }
-
-/* ── Dividers ── */
-[data-testid="stDivider"] { border-color: rgba(255,255,255,0.06) !important; }
-
-/* ── Alerts ── */
-[data-testid="stAlert"] {
-    background: #101111 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important; }
-[data-testid="stAlertContainer"] {
-    background: #101111 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 8px !important; }
-
-/* ── Sidebar ── */
-[data-testid="stSidebar"] {
-    background: #101111 !important;
-    border-right: 1px solid rgba(255,255,255,0.06) !important; }
-[data-testid="stSidebarContent"] { background: #101111 !important; }
-
-/* ── Metric ── */
-[data-testid="stMetric"] {
-    background: #101111 !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-    border-radius: 12px !important; padding: 16px !important; }
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #07080a; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
-</style>
-""", unsafe_allow_html=True)
-
 if not check_password():
     st.stop()
 
@@ -708,12 +557,12 @@ if os.path.exists(LOGO_PATH):
     st.markdown(f"""
     <div style="display:flex;flex-direction:column;align-items:center;padding:16px 0 8px 0;">
         <img src="data:image/png;base64,{logo_b64}" style="height:64px;width:auto;margin-bottom:10px;">
-        <div style="font-size:1.8rem;font-weight:700;line-height:1.2;text-align:center;color:#ffffff;letter-spacing:0.2px;">A-Tech Appraisal Co.</div>
-        <div style="color:#9c9c9d;font-size:0.85rem;text-align:center;letter-spacing:0.3px;font-weight:500;">Revision & Comment Library — Field Reference</div>
+        <div style="font-size:1.8rem;font-weight:700;line-height:1.2;text-align:center;">A-Tech Appraisal Co.</div>
+        <div style="color:gray;font-size:0.85rem;text-align:center;">Revision & Comment Library — Field Reference</div>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.markdown("<h2 style='text-align:center;color:#ffffff;letter-spacing:0.2px;'>A-Tech Appraisal Co.</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center'>A-Tech Appraisal Co.</h2>", unsafe_allow_html=True)
 st.divider()
 
 # ── Export All Data ───────────────────────────────────────────────────────────
