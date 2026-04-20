@@ -1678,12 +1678,16 @@ ADJ_DEFAULT_RATES = {
 }
 
 DEFAULT_ADJ_PRESETS = [
-    {"name": "SFR Standard",           "rates": {**ADJ_DEFAULT_RATES}},
-    {"name": "SFR Luxury",             "rates": {**ADJ_DEFAULT_RATES}},
-    {"name": "Multi-Family Standard",  "rates": {**ADJ_DEFAULT_RATES}},
-    {"name": "Multi-Family Luxury",    "rates": {**ADJ_DEFAULT_RATES}},
-    {"name": "Condo Standard",         "rates": {**ADJ_DEFAULT_RATES}},
-    {"name": "Condo Luxury",           "rates": {**ADJ_DEFAULT_RATES}},
+    {"name": "SFR \u2014 Tier 1 (Under $400k)",    "rates": {**ADJ_DEFAULT_RATES, "gla":25,  "bed":0, "fullbath":5000,  "halfbath":2500,  "basement":5000,  "garage":5000,  "encporch":4500, "deck":3000, "fp":2500, "bgr":1000, "pool":0, "cac":4000,  "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":5.0,  "ben_view":5.0}},
+    {"name": "SFR \u2014 Tier 2 ($400k\u2013$800k)", "rates": {**ADJ_DEFAULT_RATES, "gla":138, "bed":0, "fullbath":20000, "halfbath":10000, "basement":10000, "garage":14000, "encporch":7500, "deck":5000, "fp":8000, "bgr":1000, "pool":0, "cac":10000, "adu":50000, "site_rate":1, "site_unit":"sf",   "ben_loc":5.0,  "ben_view":5.0}},
+    {"name": "SFR \u2014 Tier 3 ($800k\u2013$1.5M)", "rates": {**ADJ_DEFAULT_RATES, "gla":188, "bed":0, "fullbath":22500, "halfbath":10000, "basement":15000, "garage":14500, "encporch":10000,"deck":6500, "fp":8500, "bgr":1000, "pool":0, "cac":12500, "adu":60000, "site_rate":2, "site_unit":"sf",   "ben_loc":12.0, "ben_view":12.0}},
+    {"name": "SFR \u2014 Tier 4 ($1.5M+)",          "rates": {**ADJ_DEFAULT_RATES, "gla":205, "bed":0, "fullbath":22500, "halfbath":10000, "basement":19000, "garage":15000, "encporch":12000,"deck":9000, "fp":8000, "bgr":1000, "pool":0, "cac":15000, "adu":70000, "site_rate":3, "site_unit":"sf",   "ben_loc":20.0, "ben_view":20.0}},
+    {"name": "MFR \u2014 Urban (2\u20134 Unit)",      "rates": {**ADJ_DEFAULT_RATES, "gla":17,  "bed":6500,  "fullbath":3500,  "halfbath":1750,  "basement":4000,  "garage":6500,  "encporch":0,    "deck":0,    "fp":0,    "bgr":0,    "pool":0, "cac":3000,  "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":10.0, "ben_view":10.0}},
+    {"name": "MFR \u2014 Suburban",                  "rates": {**ADJ_DEFAULT_RATES, "gla":70,  "bed":10000, "fullbath":10000, "halfbath":5000,  "basement":5000,  "garage":12500, "encporch":0,    "deck":0,    "fp":0,    "bgr":0,    "pool":0, "cac":6500,  "adu":0,     "site_rate":1, "site_unit":"sf",   "ben_loc":10.0, "ben_view":10.0}},
+    {"name": "Condo \u2014 Tier 1 (Under $350k)",   "rates": {**ADJ_DEFAULT_RATES, "gla":25,  "bed":0, "fullbath":5000,  "halfbath":2500,  "basement":3000,  "garage":10000, "encporch":3000, "deck":3000, "fp":2500, "bgr":0,    "pool":0, "cac":4000,  "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":5.0,  "ben_view":5.0}},
+    {"name": "Condo \u2014 Tier 2 ($350k\u2013$700k)","rates": {**ADJ_DEFAULT_RATES, "gla":138, "bed":0, "fullbath":20000, "halfbath":10000, "basement":7000,  "garage":15000, "encporch":4500, "deck":4500, "fp":8000, "bgr":0,    "pool":0, "cac":10000, "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":7.0,  "ben_view":7.0}},
+    {"name": "Condo \u2014 Tier 3 ($700k\u2013$1.2M)","rates": {**ADJ_DEFAULT_RATES, "gla":188, "bed":0, "fullbath":22500, "halfbath":10000, "basement":10000, "garage":20000, "encporch":7500, "deck":7500, "fp":8500, "bgr":0,    "pool":0, "cac":12500, "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":11.0, "ben_view":11.0}},
+    {"name": "Condo \u2014 Tier 4 ($1.2M+)",         "rates": {**ADJ_DEFAULT_RATES, "gla":205, "bed":0, "fullbath":22500, "halfbath":10000, "basement":13000, "garage":27500, "encporch":11500,"deck":11500,"fp":8000, "bgr":0,    "pool":0, "cac":15000, "adu":0,     "site_rate":0, "site_unit":"none", "ben_loc":15.0, "ben_view":15.0}},
 ]
 
 def load_adj_presets():
@@ -3349,8 +3353,15 @@ with tab6:
             if st.button("Load", key="adj_load_btn", use_container_width=True):
                 match = next((p for p in presets if p["name"] == sel), None)
                 if match:
+                    _int_steps  = {"gla":5,"bed":500,"fullbath":1000,"halfbath":500,"basement":1000,"garage":1000,"encporch":500,"deck":500,"fp":500,"bgr":500,"pool":1000,"cac":1000,"solar":1000,"adu":1000,"outbldg":500,"site_rate":1}
+                    _flt_steps  = {"adv_loc":2.5,"ben_loc":2.5,"adv_view":2.5,"ben_view":2.5,"time_rate":0.25}
                     for k2, v2 in match["rates"].items():
-                        st.session_state["adj_" + k2] = v2
+                        if k2 in _int_steps:
+                            st.session_state["adj_"+k2] = int(round(float(v2)/_int_steps[k2])*_int_steps[k2])
+                        elif k2 in _flt_steps:
+                            st.session_state["adj_"+k2] = round(round(float(v2)/_flt_steps[k2])*_flt_steps[k2], 4)
+                        else:
+                            st.session_state["adj_"+k2] = v2
                     st.success("Loaded: " + match["name"])
                     st.rerun()
         if st.session_state.get("site_admin"):
@@ -3369,8 +3380,8 @@ with tab6:
             if st.button("Save as new", key="adj_save_new", use_container_width=True):
                 if not nn.strip():
                     st.error("Enter a name.")
-                elif len(presets) >= 6:
-                    st.error("Max 6 presets.")
+                elif len(presets) >= 20:
+                    st.error("Max 20 presets.")
                 elif any(p["name"] == nn.strip() for p in presets):
                     st.error("Name exists.")
                 else:
@@ -3394,52 +3405,59 @@ with tab6:
             del st.session_state[k2]
         st.rerun()
 
+    def _si(k, step):
+        """Snap preset/session value to int step for slider."""
+        return int(round(float(_ag(k)) / step) * step)
+    def _sf(k, step):
+        """Snap preset/session value to float step for slider."""
+        return round(round(float(_ag(k)) / step) * step, 4)
+
     st.divider()
     st.markdown("#### Core Adjustment Rates")
-    st.caption("Set any rate to $0 to omit from paragraph.")
+    st.caption("GLA rounds to nearest $5. Dollar amounts round to $500 or $1,000. Set to $0 to omit.")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        gla_val = st.number_input("GLA (per SF over 50 SF)", min_value=0, value=int(_ag("gla")), step=1, key="adj_gla", format="%d")
+        gla_val = st.slider("GLA ($/SF)", 0, 250, _si("gla", 5), step=5, key="adj_gla", format="$%d")
     with c2:
-        bed_val = st.number_input("Bedroom", min_value=0, value=int(_ag("bed")), step=500, key="adj_bed", format="%d")
+        bed_val = st.slider("Bedroom ($)", 0, 30000, _si("bed", 500), step=500, key="adj_bed", format="$%d")
         bed_in_gla = st.checkbox("Bedroom adj in GLA", key="adjx_bed_in_gla")
     with c3:
-        fb_val = st.number_input("Full Bath", min_value=0, value=int(_ag("fullbath")), step=500, key="adj_fullbath", format="%d")
+        fb_val = st.slider("Full Bath ($)", 0, 30000, _si("fullbath", 1000), step=1000, key="adj_fullbath", format="$%d")
     with c4:
-        hb_val = st.number_input("Half Bath", min_value=0, value=int(_ag("halfbath")), step=500, key="adj_halfbath", format="%d")
+        hb_val = st.slider("Half Bath ($)", 0, 15000, _si("halfbath", 500), step=500, key="adj_halfbath", format="$%d")
     c5, c6, c7, c8 = st.columns(4)
     with c5:
-        bas_val = st.number_input("Basement", min_value=0, value=int(_ag("basement")), step=500, key="adj_basement", format="%d")
+        bas_val = st.slider("Basement ($)", 0, 30000, _si("basement", 1000), step=1000, key="adj_basement", format="$%d")
     with c6:
-        gar_val = st.number_input("Garage (per stall)", min_value=0, value=int(_ag("garage")), step=500, key="adj_garage", format="%d")
+        gar_val = st.slider("Garage/stall ($)", 0, 30000, _si("garage", 1000), step=1000, key="adj_garage", format="$%d")
     with c7:
-        enc_val = st.number_input("Enclosed Porch", min_value=0, value=int(_ag("encporch")), step=500, key="adj_encporch", format="%d")
+        enc_val = st.slider("Enclosed Porch ($)", 0, 20000, _si("encporch", 500), step=500, key="adj_encporch", format="$%d")
     with c8:
-        deck_val = st.number_input("Deck/Open Porch/Patio", min_value=0, value=int(_ag("deck")), step=500, key="adj_deck", format="%d")
+        deck_val = st.slider("Deck/Patio ($)", 0, 15000, _si("deck", 500), step=500, key="adj_deck", format="$%d")
     c9, c10 = st.columns(2)
     with c9:
-        fp_val = st.number_input("Fireplace/Woodstove", min_value=0, value=int(_ag("fp")), step=500, key="adj_fp", format="%d")
+        fp_val = st.slider("Fireplace/Woodstove ($)", 0, 15000, _si("fp", 500), step=500, key="adj_fp", format="$%d")
     with c10:
-        bgr_val = st.number_input("Below-Grade Rooms (each)", min_value=0, value=int(_ag("bgr")), step=500, key="adj_bgr", format="%d")
+        bgr_val = st.slider("Below-Grade Rooms ($)", 0, 10000, _si("bgr", 500), step=500, key="adj_bgr", format="$%d")
 
     st.divider()
     st.markdown("#### Additional Feature Adjustments")
     st.caption("Check box to include in paragraph.")
     f1, f2, f3, f4, f5 = st.columns(5)
     with f1:
-        pool_val = st.number_input("In-Ground Pool", min_value=0, value=int(_ag("pool")), step=1000, key="adj_pool", format="%d")
+        pool_val = st.slider("In-Ground Pool ($)", 0, 50000, _si("pool", 1000), step=1000, key="adj_pool", format="$%d")
         use_pool = st.checkbox("Include Pool", key="adjx_use_pool")
     with f2:
-        cac_val = st.number_input("Central AC", min_value=0, value=int(_ag("cac")), step=500, key="adj_cac", format="%d")
+        cac_val = st.slider("Central AC ($)", 0, 25000, _si("cac", 1000), step=1000, key="adj_cac", format="$%d")
         use_cac = st.checkbox("Include Central AC", key="adjx_use_cac")
     with f3:
-        solar_val = st.number_input("Solar", min_value=0, value=int(_ag("solar")), step=1000, key="adj_solar", format="%d")
+        solar_val = st.slider("Solar ($)", 0, 30000, _si("solar", 1000), step=1000, key="adj_solar", format="$%d")
         use_solar = st.checkbox("Include Solar", key="adjx_use_solar")
     with f4:
-        adu_val = st.number_input("ADU", min_value=0, value=int(_ag("adu")), step=1000, key="adj_adu", format="%d")
+        adu_val = st.slider("ADU ($)", 0, 100000, _si("adu", 1000), step=1000, key="adj_adu", format="$%d")
         use_adu = st.checkbox("Include ADU", key="adjx_use_adu")
     with f5:
-        outbldg_val = st.number_input("Out Building", min_value=0, value=int(_ag("outbldg")), step=500, key="adj_outbldg", format="%d")
+        outbldg_val = st.slider("Out Building ($)", 0, 20000, _si("outbldg", 500), step=500, key="adj_outbldg", format="$%d")
         use_outbldg = st.checkbox("Include Out Building", key="adjx_use_outbldg")
 
     st.divider()
@@ -3460,7 +3478,7 @@ with tab6:
     with t1:
         use_time = st.checkbox("Include time adjustment", key="adjx_use_time")
     with t2:
-        time_rate_val = st.number_input("Rate (% per month)", min_value=0.0, value=float(_ag("time_rate")), step=0.1, format="%.2f", key="adj_time_rate")
+        time_rate_val = st.slider("Rate (% per month)", 0.0, 5.0, _sf("time_rate", 0.25), step=0.25, key="adj_time_rate", format="%.2f%%")
     with t3:
         td_opts = ["Appreciating", "Declining"]
         td_cur = str(_ag("time_dir"))
@@ -3469,20 +3487,20 @@ with tab6:
 
     st.divider()
     st.markdown("#### Location & View Adjustments")
-    st.caption("Rates as % of sale price.")
+    st.caption("% of sale price — increments of 2.5%.")
     lv1, lv2, lv3, lv4 = st.columns(4)
     with lv1:
-        adv_loc_val = st.number_input("Adverse Location (%)", min_value=0.0, value=float(_ag("adv_loc")), step=0.5, format="%.1f", key="adj_adv_loc")
+        adv_loc_val = st.slider("Adverse Location (%)", 0.0, 30.0, _sf("adv_loc", 2.5), step=2.5, key="adj_adv_loc", format="%.1f%%")
         use_adv_loc = st.checkbox("Include Adverse Location", key="adjx_use_adv_loc")
     with lv2:
-        ben_loc_val = st.number_input("Beneficial Location (%)", min_value=0.0, value=float(_ag("ben_loc")), step=0.5, format="%.1f", key="adj_ben_loc")
+        ben_loc_val = st.slider("Beneficial Location (%)", 0.0, 30.0, _sf("ben_loc", 2.5), step=2.5, key="adj_ben_loc", format="%.1f%%")
         use_ben_loc = st.checkbox("Include Beneficial Location", key="adjx_use_ben_loc")
     with lv3:
-        adv_view_val = st.number_input("Adverse View (%)", min_value=0.0, value=float(_ag("adv_view")), step=0.5, format="%.1f", key="adj_adv_view")
+        adv_view_val = st.slider("Adverse View (%)", 0.0, 30.0, _sf("adv_view", 2.5), step=2.5, key="adj_adv_view", format="%.1f%%")
         use_adv_view = st.checkbox("Include Adverse View", key="adjx_use_adv_view")
         adv_view_type = st.text_input("Adverse view description", placeholder="e.g. highway, commercial", key="adjx_adv_view_type")
     with lv4:
-        ben_view_val = st.number_input("Beneficial View (%)", min_value=0.0, value=float(_ag("ben_view")), step=0.5, format="%.1f", key="adj_ben_view")
+        ben_view_val = st.slider("Beneficial View (%)", 0.0, 30.0, _sf("ben_view", 2.5), step=2.5, key="adj_ben_view", format="%.1f%%")
         use_ben_view = st.checkbox("Include Beneficial View", key="adjx_use_ben_view")
         ben_view_type = st.text_input("Beneficial view description", placeholder="e.g. water, golf, wooded", key="adjx_ben_view_type")
 
