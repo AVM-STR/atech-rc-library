@@ -5,3 +5,5 @@ reportlab
 numpy
 scipy
 PyMuPDF
+matplotlib
+requests
