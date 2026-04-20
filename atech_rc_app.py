@@ -3340,7 +3340,10 @@ with tab6:
             st.session_state["adj_" + _k] = _v
 
     def _ag(k):
-        return st.session_state.get("adj_" + k, ADJ_DEFAULT_RATES.get(k, 0))
+        if "adj_" + k in st.session_state:
+            return st.session_state["adj_" + k]
+        preset = st.session_state.get("_adj_preset_rates", {})
+        return preset.get(k, ADJ_DEFAULT_RATES.get(k, 0))
 
 
     st.divider()
@@ -3353,15 +3356,21 @@ with tab6:
             if st.button("Load", key="adj_load_btn", use_container_width=True):
                 match = next((p for p in presets if p["name"] == sel), None)
                 if match:
-                    _int_steps  = {"gla":5,"bed":500,"fullbath":1000,"halfbath":500,"basement":1000,"garage":1000,"encporch":500,"deck":500,"fp":500,"bgr":500,"pool":1000,"cac":1000,"solar":1000,"adu":1000,"outbldg":500,"site_rate":1}
-                    _flt_steps  = {"adv_loc":2.5,"ben_loc":2.5,"adv_view":2.5,"ben_view":2.5,"time_rate":0.25}
+                    _int_steps = {"gla":5,"bed":500,"fullbath":1000,"halfbath":500,"basement":1000,"garage":1000,"encporch":500,"deck":500,"fp":500,"bgr":500,"pool":1000,"cac":1000,"solar":1000,"adu":1000,"outbldg":500,"site_rate":1}
+                    _flt_steps = {"adv_loc":2.5,"ben_loc":2.5,"adv_view":2.5,"ben_view":2.5,"time_rate":0.25}
+                    snapped = {}
                     for k2, v2 in match["rates"].items():
                         if k2 in _int_steps:
-                            st.session_state["adj_"+k2] = int(round(float(v2)/_int_steps[k2])*_int_steps[k2])
+                            snapped[k2] = int(round(float(v2)/_int_steps[k2])*_int_steps[k2])
                         elif k2 in _flt_steps:
-                            st.session_state["adj_"+k2] = round(round(float(v2)/_flt_steps[k2])*_flt_steps[k2], 4)
+                            snapped[k2] = round(round(float(v2)/_flt_steps[k2])*_flt_steps[k2], 4)
                         else:
-                            st.session_state["adj_"+k2] = v2
+                            snapped[k2] = v2
+                    # Clear slider keys so Streamlit uses the fresh value parameter
+                    for k2 in snapped:
+                        st.session_state.pop("adj_" + k2, None)
+                    # Store preset rates for _ag to read on next render
+                    st.session_state["_adj_preset_rates"] = snapped
                     st.success("Loaded: " + match["name"])
                     st.rerun()
         if st.session_state.get("site_admin"):
