@@ -19,7 +19,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
                                  TableStyle, HRFlowable, PageBreak, KeepTogether,
-                                 Image as RLImage)
+                                 Image as RLImage, Image)
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.platypus import Flowable
