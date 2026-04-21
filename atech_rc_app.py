@@ -3340,148 +3340,203 @@ with tab6:
 
     with _sfr_tab:
         st.markdown("#### Single Family Residential — Adjustment Ranges by Tier")
+        st.caption("Synapse-validated April 2026 | All Rhode Island Counties")
         _sfr_df = pd.DataFrame({
-            "Adjustment": [
-                "GLA (per SF)", "Full Bath", "Half Bath", "Basement (finished)",
-                "Garage (per stall)", "Enclosed Porch", "Deck / Patio",
-                "Fireplace / Woodstove", "Below-Grade Rooms",
-                "Central AC", "Solar", "ADU", "Out Building",
-                "Site Size (per SF)", "Adverse Location (%)", "Beneficial Location (%)",
-                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            "Feature": [
+                "GLA (per SF) \u2014 no separate bedroom adj",
+                "Lot Size (per SF excess over typical)",
+                "Basement Finished (per SF)",
+                "Full Bath",
+                "Half Bath",
+                "Garage (per space)",
+                "Central Air Conditioning",
+                "Fireplace (per unit)",
+                "Deck / Patio / Open Porch (per feature)",
+                "Enclosed Porch (1.5\u20132x open porch rate)",
+                "Pool",
+                "Water Location Adjustment",
+                "ADU / In-Law (per SF plus bath rate)",
             ],
-            "Tier 1  (<$400k)": [
-                "$20–$30", "$3,000–$8,000", "$1,500–$4,000", "$3,000–$7,000",
-                "$3,000–$7,000", "$3,000–$6,000", "$2,000–$4,000",
-                "$1,500–$3,500", "$500–$1,500",
-                "$2,000–$6,000", "$5,000–$15,000", "N/A", "$3,000–$7,000",
-                "N/A", "2.5–7.5%", "2.5–7.5%",
-                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            "Tier 1  $200k\u2013$400k": [
+                "$20\u2013$30/SF", "$0/SF", "$10\u2013$15/SF",
+                "$5,000*", "$2,500*",
+                "$5,000",
+                "$3,000\u2013$5,000",
+                "$0\u2013$5,000 (many non-functional)",
+                "$2,000\u2013$4,000", "$3,000\u2013$6,000",
+                "Case by case", "N/A", "N/A",
             ],
-            "Tier 2  ($400k–$800k)": [
-                "$110–$165", "$15,000–$25,000", "$7,500–$12,500", "$7,500–$12,500",
-                "$10,000–$18,000", "$5,000–$10,000", "$3,500–$7,000",
-                "$5,000–$11,000", "$500–$1,500",
-                "$7,500–$12,500", "$5,000–$15,000", "$30,000–$70,000", "$3,000–$7,000",
-                "$0.50–$1.50", "2.5–7.5%", "2.5–7.5%",
-                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            "Tier 2  $400k\u2013$800k": [
+                "$125\u2013$150/SF", "$1\u2013$2/SF", "$50\u2013$65/SF",
+                "$20,000", "$10,000",
+                "$13,000\u2013$15,000",
+                "$8,000\u2013$12,000",
+                "$8,000",
+                "$4,000\u2013$6,000", "$6,000\u2013$9,000",
+                "Case by case", "N/A", "$75\u2013$100/SF",
             ],
-            "Tier 3  ($800k–$1.5M)": [
-                "$160–$215", "$17,500–$27,500", "$7,500–$12,500", "$10,000–$20,000",
-                "$11,000–$18,000", "$7,500–$12,500", "$5,000–$8,000",
-                "$6,000–$11,000", "$500–$1,500",
-                "$10,000–$15,000", "$5,000–$15,000", "$40,000–$80,000", "$3,000–$7,000",
-                "$1.00–$3.00", "2.5–7.5%", "7.5–17.5%",
-                "2.5–7.5%", "7.5–17.5%", "0.25–0.75%",
+            "Tier 3  $800k\u2013$1.5M": [
+                "$175\u2013$200/SF", "$2\u2013$3/SF", "$75\u2013$90/SF",
+                "$20,000\u2013$25,000", "$10,000",
+                "$14,000\u2013$15,000",
+                "$10,000\u2013$15,000",
+                "$8,500",
+                "$5,000\u2013$8,000", "$8,000\u2013$12,000",
+                "Case by case", "10\u201315%", "$100\u2013$125/SF",
             ],
-            "Tier 4  ($1.5M+)": [
-                "$180–$230", "$17,500–$27,500", "$7,500–$12,500", "$14,000–$24,000",
-                "$12,000–$18,000", "$9,000–$15,000", "$7,000–$11,000",
-                "$5,000–$11,000", "$500–$1,500",
-                "$12,000–$18,000", "$5,000–$15,000", "$50,000–$90,000", "$3,000–$7,000",
-                "$2.00–$4.00", "2.5–7.5%", "12.5–27.5%",
-                "2.5–7.5%", "12.5–27.5%", "0.25–0.75%",
+            "Tier 4  $1.5M+": [
+                "$195\u2013$215/SF", "$2\u2013$4/SF (up to $6/SF waterfront)", "$90\u2013$100/SF",
+                "$20,000\u2013$25,000", "$10,000",
+                "$15,000",
+                "$12,000\u2013$18,000",
+                "$8,000",
+                "$6,000\u2013$12,000", "$9,000\u2013$15,000",
+                "Case by case", "15\u201325%", "$125\u2013$150/SF",
             ],
         })
         st.dataframe(_sfr_df, use_container_width=True, hide_index=True)
-        st.caption("Ranges reflect market evidence across Rhode Island submarkets. Appraiser should select rates supported by paired sales analysis.")
+        st.caption("* Tier 1 bath adjustments based on limited data \u2014 apply with caution. GLA adjustment incorporates bedroom count \u2014 no separate bedroom line item applied. Pool adjusted case-by-case. Water location adjustments remain percentage-based.")
 
     with _mfr_tab:
-        st.markdown("#### Multi-Family Residential — Adjustment Ranges")
+        st.markdown("#### Multi-Family Residential (2\u20134 Units) \u2014 Adjustment Ranges")
+        st.caption("Synapse-validated April 2026 | All Rhode Island Counties")
         _mfr_df = pd.DataFrame({
-            "Adjustment": [
-                "GLA (per SF)", "Bedroom (per unit)", "Full Bath", "Half Bath",
-                "Basement", "Garage (per stall)", "Central AC", "Solar",
-                "Site Size (per SF)", "Adverse Location (%)", "Beneficial Location (%)",
-                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            "Feature": [
+                "Unit Count: comp has fewer units (2-fam \u2192 3-fam)",
+                "Unit Count: comp has fewer units (3-fam \u2192 4-fam)",
+                "GLA (per SF)",
+                "Lot Size (per SF excess over typical)",
+                "Basement Finished (per SF)",
+                "Bedroom (per bedroom, per unit)",
+                "Full Bath (per unit)",
+                "Half Bath (per unit)",
+                "Garage (per space)",
+                "Central Air Conditioning (per unit)",
+                "Off-Street Parking (per space)",
+                "Condition Adjustment (reflects rental income impact)",
+                "Quality Adjustment",
+                "Adverse Location / Busy Road",
+                "Superior Location Premium",
             ],
-            "Urban  (2–4 Unit)": [
-                "$12–$22", "$4,000–$9,000", "$2,000–$5,000", "$1,000–$2,500",
-                "$2,500–$5,500", "$4,000–$9,000", "$1,500–$4,500", "$5,000–$15,000",
-                "N/A", "2.5–7.5%", "5.0–15.0%",
-                "2.5–7.5%", "5.0–15.0%", "0.25–0.75%",
+            "2-Family Urban": [
+                "\u2014", "\u2014",
+                "$15\u2013$20/SF", "$0/SF", "$8\u2013$12/SF",
+                "$5,000\u2013$8,000", "$3,000\u2013$4,000", "$1,500\u2013$2,000",
+                "$5,000\u2013$8,000", "$2,000\u2013$4,000", "$3,000\u2013$5,000",
+                "5\u201310% of sale price", "5\u201310% of sale price",
+                "3\u20138% of sale price", "5\u201315% of sale price",
             ],
-            "Suburban": [
-                "$55–$85", "$7,000–$13,000", "$7,000–$13,000", "$3,500–$6,500",
-                "$3,500–$6,500", "$9,000–$16,000", "$4,500–$8,500", "$5,000–$15,000",
-                "$0.50–$1.50", "2.5–7.5%", "5.0–15.0%",
-                "2.5–7.5%", "5.0–15.0%", "0.25–0.75%",
+            "3-Family Urban": [
+                "8\u201312% of sale price", "\u2014",
+                "$15\u2013$20/SF", "$0/SF", "$8\u2013$12/SF",
+                "$5,000\u2013$8,000", "$3,000\u2013$4,000", "$1,500\u2013$2,000",
+                "$5,000\u2013$8,000", "$2,000\u2013$4,000", "$3,000\u2013$5,000",
+                "5\u201310% of sale price", "5\u201310% of sale price",
+                "3\u20138% of sale price", "5\u201315% of sale price",
+            ],
+            "4-Family Urban": [
+                "\u2014", "8\u201310% of sale price",
+                "$15\u2013$20/SF", "$0/SF", "$8\u2013$12/SF",
+                "$5,000\u2013$8,000", "$3,000\u2013$4,000", "$1,500\u2013$2,000",
+                "$5,000\u2013$8,000", "$2,000\u2013$4,000", "$3,000\u2013$5,000",
+                "5\u201310% of sale price", "5\u201310% of sale price",
+                "3\u20138% of sale price", "5\u201315% of sale price",
+            ],
+            "Suburban Multi": [
+                "8\u201312% of sale price", "8\u201310% of sale price",
+                "$60\u2013$80/SF", "$0.50\u2013$1.50/SF", "$15\u2013$25/SF",
+                "$8,000\u2013$12,000", "$8,000\u2013$12,000", "$4,000\u2013$6,000",
+                "$10,000\u2013$15,000", "$5,000\u2013$8,000", "$4,000\u2013$6,000",
+                "8\u201315% of sale price", "8\u201312% of sale price",
+                "3\u20138% of sale price", "5\u201315% of sale price",
             ],
         })
         st.dataframe(_mfr_df, use_container_width=True, hide_index=True)
-        st.caption("MFR adjustments apply per-unit unless otherwise noted. Paired sales within the same submarket preferred.")
+        st.caption("Unit count adjustments derived from median sale price differentials by unit count in subject market area. Condition and quality adjustments expressed as percentage of sale price to reflect income impact. All adjustments subject to appraiser judgment based on specific market conditions.")
 
     with _condo_tab:
-        st.markdown("#### Condominium — Adjustment Ranges by Tier")
+        st.markdown("#### Condominium Residential \u2014 Adjustment Ranges by Tier")
+        st.caption("Synapse-validated April 2026 | All Rhode Island Counties")
         _condo_df = pd.DataFrame({
-            "Adjustment": [
-                "GLA (per SF)", "Full Bath", "Half Bath", "Basement (finished)",
-                "Garage (per stall)", "Enclosed Porch / Balcony", "Deck / Patio",
-                "Fireplace / Woodstove", "Central AC", "Solar",
-                "Adverse Location (%)", "Beneficial Location (%)",
-                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            "Feature": [
+                "GLA (per SF) \u2014 no separate bedroom adj",
+                "Basement Finished (per SF)",
+                "Full Bath",
+                "Half Bath",
+                "Private / Deeded Garage Space",
+                "Assigned / Surface Parking Space",
+                "Central Air Conditioning",
+                "Fireplace (per unit)",
+                "Private Outdoor Space / Balcony / Patio",
+                "Floor Level Premium (elevator buildings)",
+                "End Unit / Corner Unit Premium",
+                "View Adjustment (superior / inferior)",
+                "HOA Fee Differential",
+                "Site / Land Adjustment",
             ],
-            "Tier 1  (<$350k)": [
-                "$20–$30", "$3,000–$8,000", "$1,500–$4,000", "$2,000–$4,000",
-                "$7,000–$13,000", "$2,000–$4,000", "$2,000–$4,000",
-                "$1,500–$3,500", "$2,000–$6,000", "$5,000–$15,000",
-                "2.5–7.5%", "2.5–7.5%",
-                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            "Tier 1  $150k\u2013$350k": [
+                "$20\u2013$30/SF", "$10\u2013$15/SF",
+                "$5,000*", "$2,500*",
+                "$8,000\u2013$12,000", "$3,000\u2013$5,000",
+                "$3,000\u2013$5,000", "$0\u2013$5,000",
+                "$2,000\u2013$4,000",
+                "Case by case 1\u20133%", "Case by case 2\u20135%",
+                "Case by case 3\u20138%",
+                "Addendum narrative", "N/A",
             ],
-            "Tier 2  ($350k–$700k)": [
-                "$110–$165", "$15,000–$25,000", "$7,500–$12,500", "$5,000–$9,000",
-                "$11,000–$19,000", "$3,000–$6,000", "$3,000–$6,000",
-                "$5,000–$11,000", "$7,500–$12,500", "$5,000–$15,000",
-                "2.5–7.5%", "4.0–10.0%",
-                "4.0–10.0%", "4.0–10.0%", "0.25–0.75%",
+            "Tier 2  $350k\u2013$700k": [
+                "$125\u2013$150/SF", "$40\u2013$55/SF",
+                "$20,000", "$10,000",
+                "$12,000\u2013$18,000", "$5,000\u2013$8,000",
+                "$8,000\u2013$12,000", "$8,000",
+                "$3,000\u2013$6,000",
+                "Case by case 2\u20135%", "Case by case 3\u20137%",
+                "Case by case 5\u201310%",
+                "Addendum narrative", "N/A",
             ],
-            "Tier 3  ($700k–$1.2M)": [
-                "$160–$215", "$17,500–$27,500", "$7,500–$12,500", "$7,500–$12,500",
-                "$16,000–$24,000", "$5,500–$9,500", "$5,500–$9,500",
-                "$6,000–$11,000", "$10,000–$15,000", "$5,000–$15,000",
-                "2.5–7.5%", "7.5–14.5%",
-                "7.5–14.5%", "7.5–14.5%", "0.25–0.75%",
+            "Tier 3  $700k\u2013$1.2M": [
+                "$175\u2013$200/SF", "$60\u2013$80/SF",
+                "$20,000\u2013$25,000", "$10,000",
+                "$15,000\u2013$25,000", "$8,000\u2013$12,000",
+                "$10,000\u2013$15,000", "$8,500",
+                "$5,000\u2013$10,000",
+                "Case by case 3\u20137%", "Case by case 4\u20138%",
+                "Case by case 8\u201315%",
+                "Addendum narrative", "N/A",
             ],
-            "Tier 4  ($1.2M+)": [
-                "$180–$230", "$17,500–$27,500", "$7,500–$12,500", "$10,000–$16,000",
-                "$22,000–$33,000", "$9,000–$14,000", "$9,000–$14,000",
-                "$5,000–$11,000", "$12,000–$18,000", "$5,000–$15,000",
-                "2.5–7.5%", "10.0–20.0%",
-                "10.0–20.0%", "10.0–20.0%", "0.25–0.75%",
+            "Tier 4  $1.2M+": [
+                "$195\u2013$215/SF", "$80\u2013$100/SF",
+                "$20,000\u2013$25,000", "$10,000",
+                "$20,000\u2013$35,000", "$10,000\u2013$15,000",
+                "$12,000\u2013$18,000", "$8,000",
+                "$8,000\u2013$15,000",
+                "Case by case 5\u201310%", "Case by case 5\u201310%",
+                "Case by case 10\u201320%",
+                "Addendum narrative", "N/A",
             ],
         })
         st.dataframe(_condo_df, use_container_width=True, hide_index=True)
-        st.caption("Condo adjustments should reflect HOA-comparable amenities. Floor level and view premiums are captured in the view/location adjustment lines.")
+        st.caption("Condo adjustments are guidelines \u2014 apply with judgment based on project type, complex, and market segment. HOA fee differentials should be addressed in addendum narrative rather than as a line item adjustment. Floor level, view, and end unit premiums are project-specific and should be market-extracted where possible.")
 
     with _addendum_tab:
-        st.markdown("#### Standard Adjustment Addendum Statement")
+        st.markdown("#### Adjustment Derivation \u2014 General Addendum Statement")
         st.caption("Copy and paste into the addendum section of the appraisal report. Edit as needed for the specific assignment.")
         _addendum_text = (
-            "The appraiser has verified each sale with MLS data and city records. "
-            "Photos of the exterior of the comparables are included in the report. "
-            "If a photo of the comparable was not possible or not permitted by the homeowner, "
-            "a recent MLS or city photo was included. "
-            "Adjustments applied are based on paired sales analysis and reflect the "
-            "reactions of typical buyers in this market segment. "
-            "GLA adjustments were applied at a rate per square foot for differences exceeding 50 SF. "
-            "Bathroom adjustments reflect market-supported values for the subject price tier. "
-            "Garage adjustments are applied on a per-stall basis. "
-            "Location and view adjustments, where applicable, are expressed as a percentage "
-            "of the sale price and are supported by matched-pair analysis. "
-            "A time adjustment was applied to reflect changing market conditions over the "
-            "search period, based on the trend in median sale prices for the subject neighborhood. "
-            "Due to a lack of sales with similar style, age, and location, it was necessary "
-            "to extend the search beyond six months. "
-            "All comparable sales have been verified as arm's-length transactions. "
-            "Any non-arm's-length transactions identified were excluded from consideration. "
-            "A search of public records revealed no prior sales or transfers of the subject "
-            "property within the three-year period prior to the effective date, unless "
-            "otherwise noted in this report. "
-            "The final opinion of value is within the indicated range, rounded."
+            "The adjustments applied in this report were derived from the appraiser's analysis "
+            "of market data within the subject's competitive market area. Quantitative methods "
+            "utilized in the development of these adjustments include grouped data analysis, "
+            "simple regression, and depreciated cost, applied across multiple datasets of "
+            "arm's length residential sales. The results of these analyses were considered in "
+            "conjunction with the appraiser's knowledge of buyer and seller behavior developed "
+            "through active appraisal practice in Rhode Island and Massachusetts markets. "
+            "Adjustments are periodically reviewed and updated to reflect current market "
+            "conditions. Supporting analyses are retained in the appraiser's workfile and "
+            "available upon request."
         )
         st.text_area(
             "Addendum text",
             value=_addendum_text,
-            height=300,
+            height=250,
             key="adj_addendum_display",
             label_visibility="collapsed",
         )
