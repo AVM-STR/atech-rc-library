@@ -3327,294 +3327,164 @@ with tab4:
                     st.success(f"**{p['cat']}:** {p['msg']}")
 
 # ═══════════════════════════════════════════════════════════════════
-# TAB 6 — ADJUSTMENT COMMENTARY GENERATOR
+# TAB 6 — ADJUSTMENT REFERENCE TABLES
 # ═══════════════════════════════════════════════════════════════════
 with tab6:
- if True:
-    st.subheader("Adjustment Commentary Generator")
-    st.caption("Configure rates, select items, and generate paste-ready addendum language.")
+    st.subheader("Adjustment Reference Tables")
+    st.caption("Market-derived adjustment ranges by property type and price tier (Rhode Island).")
     st.divider()
 
-    for _k, _v in ADJ_DEFAULT_RATES.items():
-        if "adj_" + _k not in st.session_state:
-            st.session_state["adj_" + _k] = _v
+    _sfr_tab, _mfr_tab, _condo_tab, _addendum_tab = st.tabs([
+        "🏠 Single Family", "🏢 Multi-Family", "🏙️ Condo", "📝 Addendum Statement"
+    ])
 
-    def _ag(k):
-        if "adj_" + k in st.session_state:
-            return st.session_state["adj_" + k]
-        preset = st.session_state.get("_adj_preset_rates", {})
-        return preset.get(k, ADJ_DEFAULT_RATES.get(k, 0))
+    with _sfr_tab:
+        st.markdown("#### Single Family Residential — Adjustment Ranges by Tier")
+        _sfr_df = pd.DataFrame({
+            "Adjustment": [
+                "GLA (per SF)", "Full Bath", "Half Bath", "Basement (finished)",
+                "Garage (per stall)", "Enclosed Porch", "Deck / Patio",
+                "Fireplace / Woodstove", "Below-Grade Rooms",
+                "Central AC", "Solar", "ADU", "Out Building",
+                "Site Size (per SF)", "Adverse Location (%)", "Beneficial Location (%)",
+                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            ],
+            "Tier 1  (<$400k)": [
+                "$20–$30", "$3,000–$8,000", "$1,500–$4,000", "$3,000–$7,000",
+                "$3,000–$7,000", "$3,000–$6,000", "$2,000–$4,000",
+                "$1,500–$3,500", "$500–$1,500",
+                "$2,000–$6,000", "$5,000–$15,000", "N/A", "$3,000–$7,000",
+                "N/A", "2.5–7.5%", "2.5–7.5%",
+                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            ],
+            "Tier 2  ($400k–$800k)": [
+                "$110–$165", "$15,000–$25,000", "$7,500–$12,500", "$7,500–$12,500",
+                "$10,000–$18,000", "$5,000–$10,000", "$3,500–$7,000",
+                "$5,000–$11,000", "$500–$1,500",
+                "$7,500–$12,500", "$5,000–$15,000", "$30,000–$70,000", "$3,000–$7,000",
+                "$0.50–$1.50", "2.5–7.5%", "2.5–7.5%",
+                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            ],
+            "Tier 3  ($800k–$1.5M)": [
+                "$160–$215", "$17,500–$27,500", "$7,500–$12,500", "$10,000–$20,000",
+                "$11,000–$18,000", "$7,500–$12,500", "$5,000–$8,000",
+                "$6,000–$11,000", "$500–$1,500",
+                "$10,000–$15,000", "$5,000–$15,000", "$40,000–$80,000", "$3,000–$7,000",
+                "$1.00–$3.00", "2.5–7.5%", "7.5–17.5%",
+                "2.5–7.5%", "7.5–17.5%", "0.25–0.75%",
+            ],
+            "Tier 4  ($1.5M+)": [
+                "$180–$230", "$17,500–$27,500", "$7,500–$12,500", "$14,000–$24,000",
+                "$12,000–$18,000", "$9,000–$15,000", "$7,000–$11,000",
+                "$5,000–$11,000", "$500–$1,500",
+                "$12,000–$18,000", "$5,000–$15,000", "$50,000–$90,000", "$3,000–$7,000",
+                "$2.00–$4.00", "2.5–7.5%", "12.5–27.5%",
+                "2.5–7.5%", "12.5–27.5%", "0.25–0.75%",
+            ],
+        })
+        st.dataframe(_sfr_df, use_container_width=True, hide_index=True)
+        st.caption("Ranges reflect market evidence across Rhode Island submarkets. Appraiser should select rates supported by paired sales analysis.")
 
+    with _mfr_tab:
+        st.markdown("#### Multi-Family Residential — Adjustment Ranges")
+        _mfr_df = pd.DataFrame({
+            "Adjustment": [
+                "GLA (per SF)", "Bedroom (per unit)", "Full Bath", "Half Bath",
+                "Basement", "Garage (per stall)", "Central AC", "Solar",
+                "Site Size (per SF)", "Adverse Location (%)", "Beneficial Location (%)",
+                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            ],
+            "Urban  (2–4 Unit)": [
+                "$12–$22", "$4,000–$9,000", "$2,000–$5,000", "$1,000–$2,500",
+                "$2,500–$5,500", "$4,000–$9,000", "$1,500–$4,500", "$5,000–$15,000",
+                "N/A", "2.5–7.5%", "5.0–15.0%",
+                "2.5–7.5%", "5.0–15.0%", "0.25–0.75%",
+            ],
+            "Suburban": [
+                "$55–$85", "$7,000–$13,000", "$7,000–$13,000", "$3,500–$6,500",
+                "$3,500–$6,500", "$9,000–$16,000", "$4,500–$8,500", "$5,000–$15,000",
+                "$0.50–$1.50", "2.5–7.5%", "5.0–15.0%",
+                "2.5–7.5%", "5.0–15.0%", "0.25–0.75%",
+            ],
+        })
+        st.dataframe(_mfr_df, use_container_width=True, hide_index=True)
+        st.caption("MFR adjustments apply per-unit unless otherwise noted. Paired sales within the same submarket preferred.")
 
-    st.divider()
-    presets = load_adj_presets()
-    preset_names = [p["name"] for p in presets]
+    with _condo_tab:
+        st.markdown("#### Condominium — Adjustment Ranges by Tier")
+        _condo_df = pd.DataFrame({
+            "Adjustment": [
+                "GLA (per SF)", "Full Bath", "Half Bath", "Basement (finished)",
+                "Garage (per stall)", "Enclosed Porch / Balcony", "Deck / Patio",
+                "Fireplace / Woodstove", "Central AC", "Solar",
+                "Adverse Location (%)", "Beneficial Location (%)",
+                "Adverse View (%)", "Beneficial View (%)", "Time (% / mo)",
+            ],
+            "Tier 1  (<$350k)": [
+                "$20–$30", "$3,000–$8,000", "$1,500–$4,000", "$2,000–$4,000",
+                "$7,000–$13,000", "$2,000–$4,000", "$2,000–$4,000",
+                "$1,500–$3,500", "$2,000–$6,000", "$5,000–$15,000",
+                "2.5–7.5%", "2.5–7.5%",
+                "2.5–7.5%", "2.5–7.5%", "0.25–0.75%",
+            ],
+            "Tier 2  ($350k–$700k)": [
+                "$110–$165", "$15,000–$25,000", "$7,500–$12,500", "$5,000–$9,000",
+                "$11,000–$19,000", "$3,000–$6,000", "$3,000–$6,000",
+                "$5,000–$11,000", "$7,500–$12,500", "$5,000–$15,000",
+                "2.5–7.5%", "4.0–10.0%",
+                "4.0–10.0%", "4.0–10.0%", "0.25–0.75%",
+            ],
+            "Tier 3  ($700k–$1.2M)": [
+                "$160–$215", "$17,500–$27,500", "$7,500–$12,500", "$7,500–$12,500",
+                "$16,000–$24,000", "$5,500–$9,500", "$5,500–$9,500",
+                "$6,000–$11,000", "$10,000–$15,000", "$5,000–$15,000",
+                "2.5–7.5%", "7.5–14.5%",
+                "7.5–14.5%", "7.5–14.5%", "0.25–0.75%",
+            ],
+            "Tier 4  ($1.2M+)": [
+                "$180–$230", "$17,500–$27,500", "$7,500–$12,500", "$10,000–$16,000",
+                "$22,000–$33,000", "$9,000–$14,000", "$9,000–$14,000",
+                "$5,000–$11,000", "$12,000–$18,000", "$5,000–$15,000",
+                "2.5–7.5%", "10.0–20.0%",
+                "10.0–20.0%", "10.0–20.0%", "0.25–0.75%",
+            ],
+        })
+        st.dataframe(_condo_df, use_container_width=True, hide_index=True)
+        st.caption("Condo adjustments should reflect HOA-comparable amenities. Floor level and view premiums are captured in the view/location adjustment lines.")
 
-    with st.expander("Presets", expanded=True):
-        if preset_names:
-            sel = st.selectbox("Load preset", preset_names, key="adj_load_sel")
-            if st.button("Load", key="adj_load_btn", use_container_width=True):
-                match = next((p for p in presets if p["name"] == sel), None)
-                if match:
-                    _int_steps = {"gla":5,"bed":500,"fullbath":1000,"halfbath":500,"basement":1000,"garage":1000,"encporch":500,"deck":500,"fp":500,"bgr":500,"pool":1000,"cac":1000,"solar":1000,"adu":1000,"outbldg":500,"site_rate":1}
-                    _flt_steps = {"adv_loc":2.5,"ben_loc":2.5,"adv_view":2.5,"ben_view":2.5,"time_rate":0.25}
-                    snapped = {}
-                    for k2, v2 in match["rates"].items():
-                        if k2 in _int_steps:
-                            snapped[k2] = int(round(float(v2)/_int_steps[k2])*_int_steps[k2])
-                        elif k2 in _flt_steps:
-                            snapped[k2] = round(round(float(v2)/_flt_steps[k2])*_flt_steps[k2], 4)
-                        else:
-                            snapped[k2] = v2
-                    # Clear slider keys so Streamlit uses the fresh value parameter
-                    for k2 in snapped:
-                        st.session_state.pop("adj_" + k2, None)
-                    # Store preset rates for _ag to read on next render
-                    st.session_state["_adj_preset_rates"] = snapped
-                    st.success("Loaded: " + match["name"])
-                    st.rerun()
-        if st.session_state.get("site_admin"):
-            st.markdown("---")
-            if preset_names:
-                ow = st.selectbox("Overwrite", preset_names, key="adj_ow_sel")
-                if st.button("Save to preset", key="adj_ow_btn", use_container_width=True):
-                    rates2 = {k2: st.session_state.get("adj_" + k2, ADJ_DEFAULT_RATES.get(k2, 0)) for k2 in ADJ_DEFAULT_RATES}
-                    for p in presets:
-                        if p["name"] == ow:
-                            p["rates"] = rates2
-                    save_adj_presets(presets)
-                    st.success("Saved into: " + ow)
-                    st.rerun()
-            nn = st.text_input("New preset name", key="adj_new_name", placeholder="e.g. SFR Waterfront")
-            if st.button("Save as new", key="adj_save_new", use_container_width=True):
-                if not nn.strip():
-                    st.error("Enter a name.")
-                elif len(presets) >= 20:
-                    st.error("Max 20 presets.")
-                elif any(p["name"] == nn.strip() for p in presets):
-                    st.error("Name exists.")
-                else:
-                    rates2 = {k2: st.session_state.get("adj_" + k2, ADJ_DEFAULT_RATES.get(k2, 0)) for k2 in ADJ_DEFAULT_RATES}
-                    presets.append({"name": nn.strip(), "rates": rates2})
-                    save_adj_presets(presets)
-                    st.success("Saved: " + nn.strip())
-                    st.rerun()
-            if preset_names:
-                dl = st.selectbox("Delete", preset_names, key="adj_del_sel")
-                if st.button("Delete preset", key="adj_del_btn", use_container_width=True):
-                    save_adj_presets([p for p in presets if p["name"] != dl])
-                    st.rerun()
-        else:
-            st.caption("Unlock Admin Mode to save or edit presets.")
-
-    if st.button("Reset to Defaults", key="adj_reset"):
-        for k2, v2 in ADJ_DEFAULT_RATES.items():
-            st.session_state["adj_" + k2] = v2
-        for k2 in [k3 for k3 in st.session_state if k3.startswith("adjx_")]:
-            del st.session_state[k2]
-        st.rerun()
-
-    def _si(k, step):
-        """Snap preset/session value to int step for slider."""
-        return int(round(float(_ag(k)) / step) * step)
-    def _sf(k, step):
-        """Snap preset/session value to float step for slider."""
-        return round(round(float(_ag(k)) / step) * step, 4)
-
-    st.divider()
-    st.markdown("#### Core Adjustment Rates")
-    st.caption("GLA rounds to nearest $5. Dollar amounts round to $500 or $1,000. Set to $0 to omit.")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        gla_val = st.slider("GLA ($/SF)", 0, 250, _si("gla", 5), step=5, key="adj_gla", format="$%d")
-    with c2:
-        bed_val = st.slider("Bedroom ($)", 0, 30000, _si("bed", 500), step=500, key="adj_bed", format="$%d")
-        bed_in_gla = st.checkbox("Bedroom adj in GLA", key="adjx_bed_in_gla")
-    with c3:
-        fb_val = st.slider("Full Bath ($)", 0, 30000, _si("fullbath", 1000), step=1000, key="adj_fullbath", format="$%d")
-    with c4:
-        hb_val = st.slider("Half Bath ($)", 0, 15000, _si("halfbath", 500), step=500, key="adj_halfbath", format="$%d")
-    c5, c6, c7, c8 = st.columns(4)
-    with c5:
-        bas_val = st.slider("Basement ($)", 0, 30000, _si("basement", 1000), step=1000, key="adj_basement", format="$%d")
-    with c6:
-        gar_val = st.slider("Garage/stall ($)", 0, 30000, _si("garage", 1000), step=1000, key="adj_garage", format="$%d")
-    with c7:
-        enc_val = st.slider("Enclosed Porch ($)", 0, 20000, _si("encporch", 500), step=500, key="adj_encporch", format="$%d")
-    with c8:
-        deck_val = st.slider("Deck/Patio ($)", 0, 15000, _si("deck", 500), step=500, key="adj_deck", format="$%d")
-    c9, c10 = st.columns(2)
-    with c9:
-        fp_val = st.slider("Fireplace/Woodstove ($)", 0, 15000, _si("fp", 500), step=500, key="adj_fp", format="$%d")
-    with c10:
-        bgr_val = st.slider("Below-Grade Rooms ($)", 0, 10000, _si("bgr", 500), step=500, key="adj_bgr", format="$%d")
-
-    st.divider()
-    st.markdown("#### Additional Feature Adjustments")
-    st.caption("Check box to include in paragraph.")
-    f1, f2, f3, f4, f5 = st.columns(5)
-    with f1:
-        pool_val = st.slider("In-Ground Pool ($)", 0, 50000, _si("pool", 1000), step=1000, key="adj_pool", format="$%d")
-        use_pool = st.checkbox("Include Pool", key="adjx_use_pool")
-    with f2:
-        cac_val = st.slider("Central AC ($)", 0, 25000, _si("cac", 1000), step=1000, key="adj_cac", format="$%d")
-        use_cac = st.checkbox("Include Central AC", key="adjx_use_cac")
-    with f3:
-        solar_val = st.slider("Solar ($)", 0, 30000, _si("solar", 1000), step=1000, key="adj_solar", format="$%d")
-        use_solar = st.checkbox("Include Solar", key="adjx_use_solar")
-    with f4:
-        adu_val = st.slider("ADU ($)", 0, 100000, _si("adu", 1000), step=1000, key="adj_adu", format="$%d")
-        use_adu = st.checkbox("Include ADU", key="adjx_use_adu")
-    with f5:
-        outbldg_val = st.slider("Out Building ($)", 0, 20000, _si("outbldg", 500), step=500, key="adj_outbldg", format="$%d")
-        use_outbldg = st.checkbox("Include Out Building", key="adjx_use_outbldg")
-
-    st.divider()
-    st.markdown("#### Site Size Adjustment")
-    s1, s2 = st.columns(2)
-    with s1:
-        su_map = {"none": "Not used", "sf": "Per SF", "acre": "Per acre"}
-        su_cur = su_map.get(str(_ag("site_unit")), "Not used")
-        site_unit = st.selectbox("Unit", ["Not used", "Per SF", "Per acre"],
-                                  index=["Not used", "Per SF", "Per acre"].index(su_cur),
-                                  key="adjx_site_unit")
-    with s2:
-        site_rate_val = st.number_input("Rate ($)", min_value=0, value=int(_ag("site_rate")), step=1, key="adj_site_rate", format="%d")
-
-    st.divider()
-    st.markdown("#### Time / Market Conditions")
-    t1, t2, t3 = st.columns(3)
-    with t1:
-        use_time = st.checkbox("Include time adjustment", key="adjx_use_time")
-    with t2:
-        time_rate_val = st.slider("Rate (% per month)", 0.0, 5.0, _sf("time_rate", 0.25), step=0.25, key="adj_time_rate", format="%.2f%%")
-    with t3:
-        td_opts = ["Appreciating", "Declining"]
-        td_cur = str(_ag("time_dir"))
-        td_idx = td_opts.index(td_cur) if td_cur in td_opts else 0
-        time_dir = st.selectbox("Direction", td_opts, index=td_idx, key="adj_time_dir")
-
-    st.divider()
-    st.markdown("#### Location & View Adjustments")
-    st.caption("% of sale price — increments of 2.5%.")
-    lv1, lv2, lv3, lv4 = st.columns(4)
-    with lv1:
-        adv_loc_val = st.slider("Adverse Location (%)", 0.0, 30.0, _sf("adv_loc", 2.5), step=2.5, key="adj_adv_loc", format="%.1f%%")
-        use_adv_loc = st.checkbox("Include Adverse Location", key="adjx_use_adv_loc")
-    with lv2:
-        ben_loc_val = st.slider("Beneficial Location (%)", 0.0, 30.0, _sf("ben_loc", 2.5), step=2.5, key="adj_ben_loc", format="%.1f%%")
-        use_ben_loc = st.checkbox("Include Beneficial Location", key="adjx_use_ben_loc")
-    with lv3:
-        adv_view_val = st.slider("Adverse View (%)", 0.0, 30.0, _sf("adv_view", 2.5), step=2.5, key="adj_adv_view", format="%.1f%%")
-        use_adv_view = st.checkbox("Include Adverse View", key="adjx_use_adv_view")
-        adv_view_type = st.text_input("Adverse view description", placeholder="e.g. highway, commercial", key="adjx_adv_view_type")
-    with lv4:
-        ben_view_val = st.slider("Beneficial View (%)", 0.0, 30.0, _sf("ben_view", 2.5), step=2.5, key="adj_ben_view", format="%.1f%%")
-        use_ben_view = st.checkbox("Include Beneficial View", key="adjx_use_ben_view")
-        ben_view_type = st.text_input("Beneficial view description", placeholder="e.g. water, golf, wooded", key="adjx_ben_view_type")
-
-    st.divider()
-    st.markdown("#### Condition Adjustments")
-    cn = ["1","2","3","4","5","6"]
-    cc1, cc2 = st.columns(2)
-    with cc1:
-        st.markdown("**Superior interior condition (per MLS)**")
-        sup_cond = st.multiselect("Sup cond", cn, default=["2","4"], format_func=lambda x: "Comp " + x, key="adjx_sup_cond", label_visibility="collapsed")
-    with cc2:
-        st.markdown("**Inferior interior condition (per MLS)**")
-        inf_cond = st.multiselect("Inf cond", cn, format_func=lambda x: "Comp " + x, key="adjx_inf_cond", label_visibility="collapsed")
-
-    st.divider()
-    st.markdown("#### Quality Adjustments")
-    qq1, qq2 = st.columns(2)
-    with qq1:
-        st.markdown("**Superior quality**")
-        sup_qual = st.multiselect("Sup qual", cn, format_func=lambda x: "Comp " + x, key="adjx_sup_qual", label_visibility="collapsed")
-    with qq2:
-        st.markdown("**Inferior quality**")
-        inf_qual = st.multiselect("Inf qual", cn, format_func=lambda x: "Comp " + x, key="adjx_inf_qual", label_visibility="collapsed")
-
-    st.divider()
-    st.markdown("#### Disclosure Options")
-    d1, d2, d3, d4 = st.columns(4)
-    with d1:
-        ext_search = st.checkbox("Extended search beyond 6 months", value=True, key="adjx_ext_search")
-    with d2:
-        geo_expand = st.checkbox("Geographic search expansion", key="adjx_geo_expand")
-    with d3:
-        arms_length = st.checkbox("Arms-length transaction note", key="adjx_arms_length")
-    with d4:
-        prior_sale = st.checkbox("Prior sale research note (USPAP)", key="adjx_prior_sale")
-    d5, d6 = st.columns(2)
-    with d5:
-        val_rounded = st.checkbox("Final value within range, rounded", value=True, key="adjx_val_rounded")
-
-    st.divider()
-    if st.button("Generate Paragraph", use_container_width=True, key="adj_generate"):
-        def fd(n): return "$" + "{:,}".format(int(n))
-        def fp(n): return "{:g}%".format(float(n))
-        def cl(vals):
-            if not vals: return ""
-            refs = ["#" + v for v in vals]
-            if len(refs) == 1: return "Sale " + refs[0]
-            return "Sales " + ", ".join(refs[:-1]) + " & " + refs[-1]
-
-        parts = []
-        if int(gla_val) > 0: parts.append(fd(gla_val) + " per SF GLA over 50 SF")
-        if bed_in_gla: parts.append("Bedroom adj reflected in GLA")
-        elif int(bed_val) > 0: parts.append("Bedrooms @ " + fd(bed_val))
-        if int(fb_val) > 0: parts.append("Full Bath @ " + fd(fb_val))
-        if int(hb_val) > 0: parts.append("Half Bath @ " + fd(hb_val))
-        if int(bas_val) > 0: parts.append("Basement @ " + fd(bas_val))
-        if int(gar_val) > 0: parts.append("Garage @ " + fd(gar_val) + " per stall")
-        if int(enc_val) > 0: parts.append("Enclosed Porch @ " + fd(enc_val))
-        if int(deck_val) > 0: parts.append("Deck/Open Porch/Patio @ " + fd(deck_val) + " each")
-        if int(fp_val) > 0: parts.append("Fireplace/Woodstove @ " + fd(fp_val) + " each")
-        if int(bgr_val) > 0: parts.append("Below-grade rooms @ " + fd(bgr_val) + " each")
-        if use_pool and int(pool_val) > 0: parts.append("In-ground pool @ " + fd(pool_val))
-        if use_cac and int(cac_val) > 0: parts.append("Central AC @ " + fd(cac_val))
-        if use_solar and int(solar_val) > 0: parts.append("Solar @ " + fd(solar_val))
-        if use_adu and int(adu_val) > 0: parts.append("ADU @ " + fd(adu_val))
-        if use_outbldg and int(outbldg_val) > 0: parts.append("Out building @ " + fd(outbldg_val))
-
-        adj_s = ("Adjustments made: " + "; ".join(parts) + ".") if parts else ""
-        site_s = ""
-        if site_unit == "Per SF" and int(site_rate_val) > 0:
-            site_s = " Site size adjustments were applied at " + fd(site_rate_val) + " per SF."
-        elif site_unit == "Per acre" and int(site_rate_val) > 0:
-            site_s = " Site size adjustments were applied at " + fd(site_rate_val) + " per acre."
-        time_s = ""
-        if use_time and float(time_rate_val) > 0:
-            time_s = " A time adjustment of " + fp(time_rate_val) + " per month was applied to comparables to reflect " + time_dir.lower() + " market conditions over the search period."
-        lv_parts = []
-        if use_adv_loc and float(adv_loc_val) > 0: lv_parts.append("adverse location (" + fp(adv_loc_val) + ")")
-        if use_ben_loc and float(ben_loc_val) > 0: lv_parts.append("beneficial location (" + fp(ben_loc_val) + ")")
-        if use_adv_view and float(adv_view_val) > 0:
-            desc = " — " + adv_view_type.strip() if adv_view_type.strip() else ""
-            lv_parts.append("adverse view" + desc + " (" + fp(adv_view_val) + ")")
-        if use_ben_view and float(ben_view_val) > 0:
-            desc = " — " + ben_view_type.strip() if ben_view_type.strip() else ""
-            lv_parts.append("beneficial view" + desc + " (" + fp(ben_view_val) + ")")
-        lv_s = (" Location and view adjustments applied for: " + "; ".join(lv_parts) + ".") if lv_parts else ""
-        cond_s = ""
-        if sup_cond: cond_s += " Comparable " + cl(sup_cond) + " received condition adjustment" + ("s" if len(sup_cond) > 1 else "") + " due to superior interior condition, per MLS."
-        if inf_cond: cond_s += " Comparable " + cl(inf_cond) + " received condition adjustment" + ("s" if len(inf_cond) > 1 else "") + " due to inferior interior condition, per MLS."
-        qual_s = ""
-        if sup_qual: qual_s += " Comparable " + cl(sup_qual) + " received quality adjustment" + ("s" if len(sup_qual) > 1 else "") + " due to superior overall quality relative to the subject."
-        if inf_qual: qual_s += " Comparable " + cl(inf_qual) + " received quality adjustment" + ("s" if len(inf_qual) > 1 else "") + " due to inferior overall quality relative to the subject."
-        ext_s = " Due to a lack of sales with similar style, age, and location, it was necessary to extend the search beyond six months." if ext_search else ""
-        geo_s = " Due to limited availability of comparable sales within the immediate neighborhood, the geographic search area was expanded to include competing neighborhoods and adjacent communities." if geo_expand else ""
-        arms_s = " All comparable sales have been verified as arm's-length transactions. Any non-arm's-length transactions identified were excluded from consideration." if arms_length else ""
-        prior_s = " A search of public records revealed no prior sales or transfers of the subject property within the three-year period prior to the effective date, unless otherwise noted in this report." if prior_sale else ""
-        round_s = " The final opinion of value is within the indicated range, rounded." if val_rounded else ""
-        intro = "The appraiser has verified each sale with MLS data and city records. Photos of the exterior of the comparables are included in the report. If a photo of the comparable was not possible or not permitted by the homeowner, a recent MLS or city photo was included."
-        full = (intro + " " + adj_s + site_s + time_s + lv_s + cond_s + qual_s + ext_s + geo_s + arms_s + prior_s + round_s).strip()
-        st.session_state["adj_output"] = full
-
-    if st.session_state.get("adj_output"):
-        out = st.session_state["adj_output"]
-        st.markdown("**Generated Paragraph** — " + str(len(out)) + " characters")
-        st.text_area("Paragraph output", value=caps(out), height=220, key=f"adj_out_display_{st.session_state.get('all_caps',False)}", label_visibility="collapsed")
+    with _addendum_tab:
+        st.markdown("#### Standard Adjustment Addendum Statement")
+        st.caption("Copy and paste into the addendum section of the appraisal report. Edit as needed for the specific assignment.")
+        _addendum_text = (
+            "The appraiser has verified each sale with MLS data and city records. "
+            "Photos of the exterior of the comparables are included in the report. "
+            "If a photo of the comparable was not possible or not permitted by the homeowner, "
+            "a recent MLS or city photo was included. "
+            "Adjustments applied are based on paired sales analysis and reflect the "
+            "reactions of typical buyers in this market segment. "
+            "GLA adjustments were applied at a rate per square foot for differences exceeding 50 SF. "
+            "Bathroom adjustments reflect market-supported values for the subject price tier. "
+            "Garage adjustments are applied on a per-stall basis. "
+            "Location and view adjustments, where applicable, are expressed as a percentage "
+            "of the sale price and are supported by matched-pair analysis. "
+            "A time adjustment was applied to reflect changing market conditions over the "
+            "search period, based on the trend in median sale prices for the subject neighborhood. "
+            "Due to a lack of sales with similar style, age, and location, it was necessary "
+            "to extend the search beyond six months. "
+            "All comparable sales have been verified as arm's-length transactions. "
+            "Any non-arm's-length transactions identified were excluded from consideration. "
+            "A search of public records revealed no prior sales or transfers of the subject "
+            "property within the three-year period prior to the effective date, unless "
+            "otherwise noted in this report. "
+            "The final opinion of value is within the indicated range, rounded."
+        )
+        st.text_area(
+            "Addendum text",
+            value=_addendum_text,
+            height=300,
+            key="adj_addendum_display",
+            label_visibility="collapsed",
+        )
         st.caption("Click in the box, Ctrl+A, Ctrl+C to copy.")
 
 
